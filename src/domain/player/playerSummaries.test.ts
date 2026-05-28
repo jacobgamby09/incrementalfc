@@ -10,7 +10,8 @@ import {
   calculatePlayerPot,
   getMatchRatingRows,
   getPlayerPerformanceSummary,
-  getPlayerRatingHistory
+  getPlayerRatingHistory,
+  sortMatchRatingRows
 } from "./playerSummaries";
 
 function teamStats(): MatchTeamStats {
@@ -190,5 +191,34 @@ describe("player summaries", () => {
     expect(row.clubShortName).toBe(playerClub.shortName);
     expect(row.isOwnClub).toBe(true);
     expect(row.matchContext.rating?.rating).toBe(7.2);
+  });
+
+  it("sorts match rating rows by rating", () => {
+    const baseState = generateGameState();
+    const playerClub = baseState.clubs[baseState.playerClubId];
+    const firstPlayerId = playerClub.squadPlayerIds[0];
+    const secondPlayerId = playerClub.squadPlayerIds[1];
+    let gameState = addRatedMatches(baseState, firstPlayerId, [6.2]);
+    const match = Object.values(gameState.matches)[0];
+    match.report.playerStats[secondPlayerId] = playerStats(secondPlayerId, playerClub.id, "CM", 7.8);
+    match.report.playerRatings[secondPlayerId] = {
+      playerId: secondPlayerId,
+      rating: 7.8,
+      summary: "Strong.",
+      positives: [],
+      negatives: []
+    };
+    gameState = {
+      ...gameState,
+      matches: {
+        ...gameState.matches,
+        [match.id]: match
+      }
+    };
+
+    const rows = sortMatchRatingRows(getMatchRatingRows(gameState, match, playerClub.id), { column: "rating", direction: "desc" });
+
+    expect(rows[0].playerId).toBe(secondPlayerId);
+    expect(rows[1].playerId).toBe(firstPlayerId);
   });
 });

@@ -32,6 +32,8 @@ export type DevelopmentStatRow = {
   potential: number;
   facilityCap: number;
   progressPercent: number;
+  potentialPercent: number;
+  facilityCapPercent: number;
   capStatus: CapStatus;
   recentDelta?: DevelopmentStatDelta;
 };
@@ -316,6 +318,8 @@ export function getPlayerDevelopmentSummary(player: Player, club: Club): Develop
       potential,
       facilityCap: developmentCap,
       progressPercent: Math.min(99, Math.round((progress / growthThreshold(current)) * 100)),
+      potentialPercent: potential > 0 ? Math.min(100, Math.round((current / potential) * 100)) : 0,
+      facilityCapPercent: developmentCap > 0 ? Math.min(100, Math.round((current / developmentCap) * 100)) : 0,
       capStatus: getStatCapStatus(current, potential, developmentCap),
       recentDelta: getRecentStatDelta(player.development.recentStatGrowth, key)
     };

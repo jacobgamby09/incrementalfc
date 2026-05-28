@@ -1,7 +1,7 @@
 import type { GameState } from "../types/game";
 import type { DevelopmentRewardSummary, Match } from "../types/match";
 import type { Player } from "../types/player";
-import { getPlayerCapStatus } from "./playerDevelopment";
+import { getPlayerCapStatus, getPlayerDevelopmentSummary } from "./playerDevelopment";
 
 export type DevelopmentXpGainer = {
   playerId: string;
@@ -11,6 +11,7 @@ export type DevelopmentXpGainer = {
   totalXp: number;
   progressPercent: number;
   reasonText: string;
+  statIncreaseBadges: string[];
 };
 
 export type MatchDevelopmentSummary = {
@@ -73,6 +74,13 @@ export function getMatchDevelopmentSummary(gameState: GameState, match: Match): 
   const totalMatchXp = Object.values(match.rewards.playerXp).reduce((sum, reward) => sum + reward.matchXp, 0);
   const totalTrainingXp = Object.values(trainingXp).reduce((sum, xp) => sum + xp, 0);
   const tacticalFamiliarityGained = Object.values(match.rewards.tacticalFamiliarity).reduce((sum, gain) => sum + gain, 0);
+  const statGrowthByPlayerId = statGrowth.reduce<Record<string, string[]>>((map, summary) => {
+    map[summary.playerId] = summary.statGrowth.map((growth) => {
+      const delta = growth.to - growth.from;
+      return `${delta > 0 ? "+" : ""}${delta} ${growth.statKey}`;
+    });
+    return map;
+  }, {});
   const xpGainers = playerClub.squadPlayerIds
     .map((playerId) => {
       const player = gameState.players[playerId];
@@ -81,14 +89,16 @@ export function getMatchDevelopmentSummary(gameState: GameState, match: Match): 
       const matchReward = match.rewards.playerXp[playerId];
       const playerTrainingXp = trainingXp[playerId] ?? 0;
       const totalXp = matchXp + playerTrainingXp;
+      const progressPercent = getPlayerDevelopmentSummary(player, playerClub).nextProgressPercent;
       return {
         playerId,
         playerName: playerName(player),
         matchXp,
         trainingXp: playerTrainingXp,
         totalXp,
-        progressPercent: Math.max(...Object.values(player.development.statProgress), 0),
-        reasonText: xpReasonText(player, matchReward, playerTrainingXp)
+        progressPercent,
+        reasonText: xpReasonText(player, matchReward, playerTrainingXp),
+        statIncreaseBadges: statGrowthByPlayerId[playerId] ?? []
       };
     })
     .filter((entry): entry is DevelopmentXpGainer => Boolean(entry));

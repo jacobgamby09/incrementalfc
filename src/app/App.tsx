@@ -1,4 +1,6 @@
-import { BarChart3, RefreshCw, Shirt, Trophy } from "lucide-react";
+import { useState } from "react";
+import { BarChart3, RefreshCw, Settings, Shirt, Trophy } from "lucide-react";
+import { confirmNewGame } from "./newGameConfirmation";
 import { routes } from "./routes";
 import { useGameStore, type ScreenId } from "../store/gameStore";
 import { DashboardScreen } from "../ui/screens/DashboardScreen";
@@ -33,7 +35,14 @@ export function App(): JSX.Element {
     playSelectedFixture,
     viewMatchReport
   } = useGameStore();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const playerClub = gameState.clubs[gameState.playerClubId];
+
+  function handleNewGame(): void {
+    if (!confirmNewGame()) return;
+    createNewGame();
+    setSettingsOpen(false);
+  }
 
   return (
     <div className="min-h-screen bg-stone-100 text-stone-950">
@@ -69,15 +78,29 @@ export function App(): JSX.Element {
                 );
               })}
             </nav>
-            <button
-              type="button"
-              onClick={createNewGame}
-              title="Create New Game"
-              className="flex h-10 items-center gap-2 rounded-md bg-stone-950 px-4 text-sm font-semibold text-white transition hover:bg-pitch-700"
-            >
-              <RefreshCw className="h-4 w-4" aria-hidden="true" />
-              <span>New Game</span>
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setSettingsOpen((open) => !open)}
+                title="Settings"
+                className="flex h-10 items-center gap-2 rounded-md border border-stone-300 bg-white px-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50"
+              >
+                <Settings className="h-4 w-4" aria-hidden="true" />
+                <span>Settings</span>
+              </button>
+              {settingsOpen && (
+                <div className="absolute right-0 z-30 mt-2 w-56 rounded-md border border-stone-300 bg-white p-2 shadow-lg">
+                  <button
+                    type="button"
+                    onClick={handleNewGame}
+                    className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-red-700 transition hover:bg-red-50"
+                  >
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    <span>New Game</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>

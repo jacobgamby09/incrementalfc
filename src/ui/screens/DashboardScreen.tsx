@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { CalendarDays, Landmark, Play, Shield, TrendingUp } from "lucide-react";
 import type { GameState } from "../../domain/types/game";
 import { formatCurrency, formatNumber } from "../../utils/format";
 import { LeagueTable } from "../components/tables/LeagueTable";
 import { SquadPreview } from "../components/player/SquadPreview";
+import { PlayerDetailSheet } from "../components/player/PlayerDetailSheet";
 
 type DashboardScreenProps = {
   gameState: GameState;
@@ -24,6 +26,8 @@ export function DashboardScreen({ gameState, onPrepareMatch }: DashboardScreenPr
     nextFixture?.homeClubId === playerClub.id ? nextFixture.awayClubId : nextFixture?.homeClubId;
   const opponent = opponentId ? gameState.clubs[opponentId] : undefined;
   const venue = nextFixture?.homeClubId === playerClub.id ? "Home" : "Away";
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const selectedPlayer = selectedPlayerId ? gameState.players[selectedPlayerId] : undefined;
 
   return (
     <div className="space-y-6">
@@ -105,9 +109,18 @@ export function DashboardScreen({ gameState, onPrepareMatch }: DashboardScreenPr
         </div>
         <div className="rounded-md border border-stone-300 bg-white p-4">
           <h2 className="mb-3 text-lg font-semibold">Squad Preview</h2>
-          <SquadPreview players={playerSquad} gameState={gameState} limit={12} />
+          <SquadPreview
+            players={playerSquad}
+            gameState={gameState}
+            limit={12}
+            onSelectPlayer={(player) => setSelectedPlayerId(player.id)}
+          />
         </div>
       </section>
+
+      {selectedPlayer && (
+        <PlayerDetailSheet player={selectedPlayer} gameState={gameState} onClose={() => setSelectedPlayerId(null)} />
+      )}
     </div>
   );
 }

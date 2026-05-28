@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { defaultLeagueSort, sortLeagueTable, type LeagueSort, type LeagueSortColumn } from "../../../domain/league/leagueTableView";
 import type { GameState } from "../../../domain/types/game";
 
 type LeagueTableProps = {
@@ -7,29 +9,39 @@ type LeagueTableProps = {
 
 export function LeagueTable({ gameState, limit }: LeagueTableProps): JSX.Element {
   const season = gameState.seasons[gameState.currentSeasonId];
-  const sortedTable = [...season.table]
-    .sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
-      if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-      return gameState.clubs[a.clubId].name.localeCompare(gameState.clubs[b.clubId].name);
-    })
-    .slice(0, limit);
+  const [sort, setSort] = useState<LeagueSort>(defaultLeagueSort);
+  const sortedTable = sortLeagueTable(season.table, gameState, sort).slice(0, limit);
+  const columns: Array<{ label: LeagueSortColumn; className: string }> = [
+    { label: "Club", className: "py-2 pr-3 text-left" },
+    { label: "P", className: "px-3 py-2 text-right" },
+    { label: "W", className: "px-3 py-2 text-right" },
+    { label: "D", className: "px-3 py-2 text-right" },
+    { label: "L", className: "px-3 py-2 text-right" },
+    { label: "GF", className: "px-3 py-2 text-right" },
+    { label: "GA", className: "px-3 py-2 text-right" },
+    { label: "GD", className: "px-3 py-2 text-right" },
+    { label: "Pts", className: "py-2 pl-3 text-right" }
+  ];
+
+  function toggleSort(column: LeagueSortColumn): void {
+    setSort((current) => ({
+      column,
+      direction: current.column === column && current.direction === "asc" ? "desc" : "asc"
+    }));
+  }
 
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full border-collapse text-left text-sm">
         <thead>
           <tr className="border-b border-stone-300 text-xs uppercase text-stone-500">
-            <th className="py-2 pr-3 font-semibold">Club</th>
-            <th className="px-3 py-2 text-right font-semibold">P</th>
-            <th className="px-3 py-2 text-right font-semibold">W</th>
-            <th className="px-3 py-2 text-right font-semibold">D</th>
-            <th className="px-3 py-2 text-right font-semibold">L</th>
-            <th className="px-3 py-2 text-right font-semibold">GF</th>
-            <th className="px-3 py-2 text-right font-semibold">GA</th>
-            <th className="px-3 py-2 text-right font-semibold">GD</th>
-            <th className="py-2 pl-3 text-right font-semibold">Pts</th>
+            {columns.map((column) => (
+              <th key={column.label} className={`${column.className} font-semibold`}>
+                <button type="button" onClick={() => toggleSort(column.label)} className="font-semibold underline-offset-2 hover:underline">
+                  {column.label}{sort.column === column.label ? (sort.direction === "asc" ? " ↑" : " ↓") : ""}
+                </button>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>

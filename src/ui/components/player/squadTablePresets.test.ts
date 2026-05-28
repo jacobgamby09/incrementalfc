@@ -8,7 +8,23 @@ describe("squad table presets", () => {
     const development = squadTablePresets.find((preset) => preset.id === "development")!;
 
     expect(overview.columns).toEqual(expect.arrayContaining(["Player", "OVR", "Est. POT", "Form", "Avg Rating"]));
-    expect(attributes.columns).toContain("TEC");
+    expect(attributes.columns).toEqual([
+      "Player",
+      "Position",
+      "PAS",
+      "SHO",
+      "TAC",
+      "CRO",
+      "HEA",
+      "ACC",
+      "REF",
+      "HAN",
+      "DIS",
+      "TEC",
+      "PHY",
+      "MEN"
+    ]);
+    expect(attributes.columns).not.toEqual(expect.arrayContaining(["PAS/REF", "SHO/HAN", "TAC/DIS"]));
     expect(development.columns).toEqual([
       "Player",
       "Age",
@@ -21,6 +37,6 @@ describe("squad table presets", () => {
       "Recent Growth",
       "Cap Status"
     ]);
-    expect(Math.max(...squadTablePresets.map((preset) => preset.columns.length))).toBeLessThanOrEqual(11);
+    expect(Math.max(...squadTablePresets.filter((preset) => preset.id !== "attributes").map((preset) => preset.columns.length))).toBeLessThanOrEqual(10);
   });
 });

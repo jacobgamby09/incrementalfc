@@ -3,7 +3,10 @@ import type { GameState } from "../../domain/types/game";
 import type { MatchTeamStats } from "../../domain/types/match";
 import {
   getMatchRatingRows,
+  sortMatchRatingRows,
   type MatchRatingFilter,
+  type MatchRatingSort,
+  type MatchRatingSortColumn,
   type MatchRatingRow
 } from "../../domain/player/playerSummaries";
 import { getMatchDevelopmentSummary } from "../../domain/development/developmentPresentation";
@@ -44,6 +47,7 @@ export function MatchReportScreen({
 }: MatchReportScreenProps): JSX.Element {
   const match = gameState.matches[matchId];
   const [ratingFilter, setRatingFilter] = useState<MatchRatingFilter>("all");
+  const [ratingSort, setRatingSort] = useState<MatchRatingSort>({ column: "rating", direction: "desc" });
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [selectedRatingRow, setSelectedRatingRow] = useState<MatchRatingRow | undefined>(undefined);
   const playerIsHome = match.homeClubId === gameState.playerClubId;
@@ -51,8 +55,8 @@ export function MatchReportScreen({
   const opponentStats = playerIsHome ? match.report.awayStats : match.report.homeStats;
   const playerClub = gameState.clubs[gameState.playerClubId];
   const opponentClub = gameState.clubs[playerIsHome ? match.awayClubId : match.homeClubId];
-  const allRatingRows = getMatchRatingRows(gameState, match, gameState.playerClubId);
-  const filteredRatingRows = getMatchRatingRows(gameState, match, gameState.playerClubId, ratingFilter);
+  const allRatingRows = sortMatchRatingRows(getMatchRatingRows(gameState, match, gameState.playerClubId));
+  const filteredRatingRows = sortMatchRatingRows(getMatchRatingRows(gameState, match, gameState.playerClubId, ratingFilter), ratingSort);
   const topPerformers = allRatingRows.slice(0, 3);
   const underperformers = allRatingRows.filter((row) => row.rating < 6).slice(0, 3);
   const selectedPlayer = selectedPlayerId ? gameState.players[selectedPlayerId] : undefined;
@@ -61,6 +65,23 @@ export function MatchReportScreen({
   function openPlayer(row: MatchRatingRow): void {
     setSelectedPlayerId(row.playerId);
     setSelectedRatingRow(row);
+  }
+
+  function openPlayerId(playerId: string): void {
+    setSelectedPlayerId(playerId);
+    setSelectedRatingRow(allRatingRows.find((row) => row.playerId === playerId));
+  }
+
+  function toggleRatingSort(column: MatchRatingSortColumn): void {
+    setRatingSort((current) => ({
+      column,
+      direction: current.column === column && current.direction === "asc" ? "desc" : "asc"
+    }));
+  }
+
+  function ratingSortMark(column: MatchRatingSortColumn): string {
+    if (ratingSort.column !== column) return "";
+    return ratingSort.direction === "asc" ? " ↑" : " ↓";
   }
 
   return (
@@ -158,26 +179,35 @@ export function MatchReportScreen({
           <div>
             <h4 className="text-sm font-semibold uppercase text-stone-500">Top XP Gainers</h4>
             <div className="mt-2 space-y-2 text-sm">
-              {developmentSummary.topXpGainers.map((entry) => (
-                <div key={entry.playerId} className="rounded border border-stone-200 bg-stone-50 px-3 py-2">
+              {developmentSummary.topXpGainers.slice(0, 4).map((entry) => {
+                const player = gameState.players[entry.playerId];
+                return (
+                <div key={entry.playerId} className="rounded border border-stone-200 bg-stone-50 px-3 py-2" title={entry.reasonText}>
                   <div className="flex justify-between gap-3">
-                    <span className="font-medium">{entry.playerName}</span>
-                    <span className="font-bold tabular-nums">+{entry.totalXp} XP</span>
+                    {player ? (
+                      <PlayerNameButton
+                        player={player}
+                        isOwnClub
+                        onClick={() => openPlayerId(entry.playerId)}
+                      />
+                    ) : (
+                      <span className="font-medium">{entry.playerName}</span>
+                    )}
+                    <span className="flex items-center gap-2">
+                      {entry.statIncreaseBadges.map((badge) => (
+                        <span key={badge} className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                          {badge}
+                        </span>
+                      ))}
+                      <span className="font-bold tabular-nums">+{entry.totalXp} XP</span>
+                    </span>
                   </div>
-                  <p className="mt-1 text-xs text-stone-600">{entry.reasonText}</p>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded bg-stone-200">
+                    <div className="h-full rounded bg-emerald-500" style={{ width: `${Math.min(100, entry.progressPercent)}%` }} />
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold uppercase text-stone-500">{developmentSummary.bankedProgressLabel}</h4>
-            <div className="mt-2 space-y-2 text-sm">
-              {developmentSummary.bankedProgressPlayers.map((entry) => (
-                <div key={entry.playerId} className="flex justify-between gap-3 rounded border border-stone-200 bg-stone-50 px-3 py-2">
-                  <span>{entry.playerName}</span>
-                  <span className="font-bold tabular-nums">+{entry.matchXp} match / +{entry.trainingXp} training</span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           <div>
@@ -190,31 +220,18 @@ export function MatchReportScreen({
               )}
               {developmentSummary.improvedPlayers.map((summary) => (
                 <div key={summary.playerId} className="rounded border border-pitch-200 bg-pitch-50 px-3 py-2">
-                  <span className="font-semibold">{summary.playerName}</span>
+                  {gameState.players[summary.playerId] ? (
+                    <PlayerNameButton
+                      player={gameState.players[summary.playerId]}
+                      isOwnClub
+                      onClick={() => openPlayerId(summary.playerId)}
+                    />
+                  ) : (
+                    <span className="font-semibold">{summary.playerName}</span>
+                  )}
                   <span className="ml-2 text-stone-700">
                     {summary.statGrowth.map((growth) => `+${growth.to - growth.from} ${growth.statKey}`).join(", ")}
                   </span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold uppercase text-stone-500">Caps & Potential</h4>
-            <div className="mt-2 space-y-2 text-sm">
-              {developmentSummary.capWarnings.length === 0 && (
-                <div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-stone-600">
-                  No development caps are currently blocking the main squad.
-                </div>
-              )}
-              {developmentSummary.capSummaries.map((summary) => (
-                <div key={summary} className="rounded border border-orange-200 bg-orange-50 px-3 py-2 font-medium text-orange-900">
-                  {summary}
-                </div>
-              ))}
-              {developmentSummary.capWarningExamples.map((warning) => (
-                <div key={warning.playerId} className="flex justify-between gap-3 rounded border border-orange-200 bg-orange-50 px-3 py-2">
-                  <span>{warning.playerName}</span>
-                  <span className="font-semibold text-orange-800">{warning.status}</span>
                 </div>
               ))}
             </div>
@@ -331,10 +348,26 @@ export function MatchReportScreen({
           <table className="min-w-full border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-stone-300 text-xs uppercase text-stone-500">
-                <th className="py-2 pr-3 font-semibold">Player</th>
-                <th className="px-3 py-2 font-semibold">Club</th>
-                <th className="px-3 py-2 font-semibold">Position</th>
-                <th className="px-3 py-2 text-right font-semibold">Rating</th>
+                <th className="py-2 pr-3 font-semibold">
+                  <button type="button" onClick={() => toggleRatingSort("player")} className="font-semibold underline-offset-2 hover:underline">
+                    Player{ratingSortMark("player")}
+                  </button>
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  <button type="button" onClick={() => toggleRatingSort("club")} className="font-semibold underline-offset-2 hover:underline">
+                    Club{ratingSortMark("club")}
+                  </button>
+                </th>
+                <th className="px-3 py-2 font-semibold">
+                  <button type="button" onClick={() => toggleRatingSort("position")} className="font-semibold underline-offset-2 hover:underline">
+                    Position{ratingSortMark("position")}
+                  </button>
+                </th>
+                <th className="px-3 py-2 text-right font-semibold">
+                  <button type="button" onClick={() => toggleRatingSort("rating")} className="font-semibold underline-offset-2 hover:underline">
+                    Rating{ratingSortMark("rating")}
+                  </button>
+                </th>
                 <th className="py-2 pl-3 font-semibold">Key Stats</th>
               </tr>
             </thead>

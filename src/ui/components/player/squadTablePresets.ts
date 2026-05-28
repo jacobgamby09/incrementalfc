@@ -15,7 +15,7 @@ export const squadTablePresets: SquadTablePreset[] = [
   {
     id: "attributes",
     label: "Attributes",
-    columns: ["Player", "Position", "PAS/REF", "SHO/HAN", "TAC/DIS", "CRO", "HEA", "ACC", "TEC", "PHY", "MEN"]
+    columns: ["Player", "Position", "PAS", "SHO", "TAC", "CRO", "HEA", "ACC", "REF", "HAN", "DIS", "TEC", "PHY", "MEN"]
   },
   {
     id: "performance",

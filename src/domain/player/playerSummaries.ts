@@ -158,6 +158,36 @@ export function keyPlayerStatsSummary(stats: PlayerMatchStats): string {
 }
 
 export type MatchRatingFilter = "all" | "player" | "opponent";
+export type MatchRatingSortColumn = "player" | "club" | "position" | "rating";
+export type MatchRatingSort = {
+  column: MatchRatingSortColumn;
+  direction: "asc" | "desc";
+};
+
+export function sortMatchRatingRows(rows: MatchRatingRow[], sort: MatchRatingSort = { column: "rating", direction: "desc" }): MatchRatingRow[] {
+  const direction = sort.direction === "asc" ? 1 : -1;
+  return rows.slice().sort((left, right) => {
+    const leftValue = sort.column === "player"
+      ? left.playerName
+      : sort.column === "club"
+        ? left.clubShortName
+        : sort.column === "position"
+          ? left.position
+          : left.rating;
+    const rightValue = sort.column === "player"
+      ? right.playerName
+      : sort.column === "club"
+        ? right.clubShortName
+        : sort.column === "position"
+          ? right.position
+          : right.rating;
+    const result = typeof leftValue === "number" && typeof rightValue === "number"
+      ? leftValue - rightValue
+      : String(leftValue).localeCompare(String(rightValue));
+    if (result !== 0) return result * direction;
+    return right.rating - left.rating;
+  });
+}
 
 export function getMatchRatingRows(
   gameState: GameState,
@@ -196,6 +226,5 @@ export function getMatchRatingRows(
         }
       };
     })
-    .filter((row): row is MatchRatingRow => Boolean(row))
-    .sort((a, b) => b.rating - a.rating);
+    .filter((row): row is MatchRatingRow => Boolean(row));
 }

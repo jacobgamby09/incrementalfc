@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   calculatePlayerOvr,
   calculatePlayerPot,
@@ -6,9 +7,19 @@ import {
 import { getPlayerCapStatus, getPlayerDevelopmentSummary, summarizeGrowth } from "../../../domain/development/playerDevelopment";
 import type { GameState } from "../../../domain/types/game";
 import type { Player } from "../../../domain/types/player";
-import { isGoalkeeperStats } from "../../../domain/types/player";
+import type { PlayerPosition } from "../../../domain/types/player";
+import { getStatDefinition, statTooltip } from "../../../domain/player/statDefinitions";
+import {
+  filterSquadPlayers,
+  getSquadStatValue,
+  sortSquadPlayers,
+  type SquadAgeFilter,
+  type SquadFilters,
+  type SquadSort
+} from "../../../domain/player/squadTableView";
 import { formatCurrency } from "../../../utils/format";
 import { PlayerNameButton } from "./PlayerNameButton";
+import { StatLabel } from "./StatLabel";
 import { squadTablePresets, type SquadTablePresetId } from "./squadTablePresets";
 
 type SquadPreviewProps = {
@@ -21,29 +32,7 @@ type SquadPreviewProps = {
 };
 
 function statValue(player: Player, key: string): string | number {
-  const stats = player.currentStats;
-  if (isGoalkeeperStats(stats)) {
-    if (key === "PAS/REF") return stats.REF;
-    if (key === "SHO/HAN") return stats.HAN;
-    if (key === "TAC/DIS") return stats.DIS;
-    if (key === "TEC") return stats.TEC;
-    if (key === "PHY") return stats.PHY;
-    if (key === "MEN") return stats.MEN;
-    return "-";
-  }
-
-  const map: Record<string, number | undefined> = {
-    "PAS/REF": stats.PAS,
-    "SHO/HAN": stats.SHO,
-    "TAC/DIS": stats.TAC,
-    CRO: stats.CRO,
-    HEA: stats.HEA,
-    ACC: stats.ACC,
-    TEC: stats.TEC,
-    PHY: stats.PHY,
-    MEN: stats.MEN
-  };
-  return map[key] ?? "-";
+  return getSquadStatValue(player, key);
 }
 
 function formPills(ratings: number[]): JSX.Element {
@@ -113,29 +102,85 @@ export function SquadPreview({
   onSelectPlayer
 }: SquadPreviewProps): JSX.Element {
   const selectedPreset = squadTablePresets.find((candidate) => candidate.id === preset) ?? squadTablePresets[0];
-  const displayedPlayers = players
-    .slice()
-    .sort((a, b) => a.primaryPosition.localeCompare(b.primaryPosition) || a.lastName.localeCompare(b.lastName))
-    .slice(0, limit);
+  const [sort, setSort] = useState<SquadSort>({ column: "Position", direction: "asc" });
+  const [filters, setFilters] = useState<SquadFilters>({ position: "all", capStatus: "all", ageGroup: "all" });
+  const positions = Array.from(new Set(players.map((player) => player.primaryPosition))).sort();
+  const capStatuses = Array.from(new Set(players.map((player) => {
+    const club = gameState && player.clubId ? gameState.clubs[player.clubId] : undefined;
+    return club ? getPlayerCapStatus(player, club) : "Developing";
+  }))).sort();
+  const displayedPlayers = sortSquadPlayers(filterSquadPlayers(players, gameState, filters), sort, gameState).slice(0, limit);
+
+  function toggleSort(column: string): void {
+    setSort((current) => ({
+      column,
+      direction: current.column === column && current.direction === "asc" ? "desc" : "asc"
+    }));
+  }
+
+  function sortMark(column: string): string {
+    if (sort.column !== column) return "";
+    return sort.direction === "asc" ? " ?" : " ?";
+  }
 
   return (
     <div className="space-y-3">
       {onPresetChange && (
-        <div className="flex flex-wrap gap-2">
-          {squadTablePresets.map((candidate) => (
-            <button
-              key={candidate.id}
-              type="button"
-              onClick={() => onPresetChange(candidate.id)}
-              className={`h-9 rounded-md border px-3 text-sm font-semibold transition ${
-                selectedPreset.id === candidate.id
-                  ? "border-pitch-700 bg-pitch-700 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
-              }`}
-            >
-              {candidate.label}
-            </button>
-          ))}
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {squadTablePresets.map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => onPresetChange(candidate.id)}
+                className={`h-9 rounded-md border px-3 text-sm font-semibold transition ${
+                  selectedPreset.id === candidate.id
+                    ? "border-pitch-700 bg-pitch-700 text-white"
+                    : "border-stone-300 bg-white text-stone-700 hover:bg-stone-50"
+                }`}
+              >
+                {candidate.label}
+              </button>
+            ))}
+          </div>
+          <div className="grid gap-2 text-sm sm:grid-cols-3">
+            <label className="font-medium text-stone-700">
+              Position
+              <select
+                value={filters.position}
+                onChange={(event) => setFilters((current) => ({ ...current, position: event.target.value as "all" | PlayerPosition }))}
+                className="mt-1 h-9 w-full rounded border border-stone-300 bg-white px-2 text-sm"
+              >
+                <option value="all">All positions</option>
+                {positions.map((position) => <option key={position} value={position}>{position}</option>)}
+              </select>
+            </label>
+            <label className="font-medium text-stone-700">
+              Cap Status
+              <select
+                value={filters.capStatus}
+                onChange={(event) => setFilters((current) => ({ ...current, capStatus: event.target.value as SquadFilters["capStatus"] }))}
+                className="mt-1 h-9 w-full rounded border border-stone-300 bg-white px-2 text-sm"
+              >
+                <option value="all">All cap statuses</option>
+                {capStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+              </select>
+            </label>
+            <label className="font-medium text-stone-700">
+              Age Group
+              <select
+                value={filters.ageGroup}
+                onChange={(event) => setFilters((current) => ({ ...current, ageGroup: event.target.value as SquadAgeFilter }))}
+                className="mt-1 h-9 w-full rounded border border-stone-300 bg-white px-2 text-sm"
+              >
+                <option value="all">All ages</option>
+                <option value="youth">Youth</option>
+                <option value="developing">Developing</option>
+                <option value="prime">Prime</option>
+                <option value="veteran">Veteran</option>
+              </select>
+            </label>
+          </div>
         </div>
       )}
       <div className="overflow-x-auto">
@@ -144,7 +189,14 @@ export function SquadPreview({
             <tr className="border-b border-stone-300 text-xs uppercase text-stone-500">
               {selectedPreset.columns.map((column) => (
                 <th key={column} className="px-3 py-2 font-semibold first:pl-0 last:pr-0">
-                  {column}
+                  <button
+                    type="button"
+                    onClick={() => toggleSort(column)}
+                    className="font-semibold underline-offset-2 hover:underline"
+                    title={statTooltip(column)}
+                  >
+                    {getStatDefinition(column) ? <StatLabel code={column} /> : column}{sortMark(column)}
+                  </button>
                 </th>
               ))}
             </tr>
@@ -173,3 +225,4 @@ export function SquadPreview({
     </div>
   );
 }
+

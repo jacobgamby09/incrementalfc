@@ -4,6 +4,7 @@ import type { PlayerMatchContext } from "../../../domain/player/playerSummaries"
 import type { GameState } from "../../../domain/types/game";
 import type { Player, PlayerPosition } from "../../../domain/types/player";
 import { formatCurrency } from "../../../utils/format";
+import { StatLabel } from "./StatLabel";
 
 type PlayerDetailSheetProps = {
   player: Player;
@@ -171,11 +172,15 @@ export function PlayerDetailSheet({
                   potential: stat.potential,
                   facilityCap: "-",
                   progressPercent: 0,
+                  potentialPercent: 0,
+                  facilityCapPercent: 0,
                   capStatus: "Developing",
                   recentDelta: undefined
                 }))).map((stat) => (
                   <tr key={stat.statKey} className="border-b border-stone-200">
-                    <td className="py-2 pr-3 font-semibold">{stat.statKey}</td>
+                    <td className="py-2 pr-3 font-semibold">
+                      <StatLabel code={stat.statKey} />
+                    </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       <span>{stat.current}</span>
                       {stat.recentDelta && (
@@ -194,6 +199,15 @@ export function PlayerDetailSheet({
                     <td className="py-2 pl-3 text-right">
                       <span className="font-semibold tabular-nums">{stat.progressPercent}%</span>
                       <span className="ml-2 text-xs text-stone-500">{stat.capStatus}</span>
+                      <div className="mt-1" title={`${stat.statKey}: ${stat.progressPercent}% toward next growth`}>
+                        <div className="h-1.5 overflow-hidden rounded bg-stone-200">
+                          <div
+                            data-testid={`stat-growth-progress-${stat.statKey}`}
+                            className="h-full rounded bg-emerald-500"
+                            style={{ width: `${stat.progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}

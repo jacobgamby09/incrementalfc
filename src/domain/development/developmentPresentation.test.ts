@@ -84,4 +84,47 @@ describe("development presentation", () => {
     expect(summary.capWarningExamples.length).toBeLessThanOrEqual(4);
     expect(summary.capWarnings.length).toBeGreaterThan(summary.capWarningExamples.length);
   });
+
+  it("adds stat increase badges to top XP gainers", () => {
+    const gameState = generateGameState();
+    const club = gameState.clubs[gameState.playerClubId];
+    const playerId = club.squadPlayerIds[0];
+    const fixture = gameState.seasons[gameState.currentSeasonId].fixtures.find(
+      (candidate) => candidate.homeClubId === club.id || candidate.awayClubId === club.id
+    )!;
+    const lineup = autoSelectLineup(club, gameState, club.tactics.activeTactic);
+    const result = playMatchday({
+      gameState,
+      fixtureId: fixture.id,
+      playerLineup: lineup,
+      playerTactic: club.tactics.activeTactic,
+      rng: () => 0.42
+    });
+    const match = {
+      ...result.gameState.matches[result.playerMatchId],
+      rewards: {
+        ...result.gameState.matches[result.playerMatchId].rewards,
+        playerXp: {
+          ...result.gameState.matches[result.playerMatchId].rewards.playerXp,
+          [playerId]: {
+            ...result.gameState.matches[result.playerMatchId].rewards.playerXp[playerId],
+            matchXp: 999
+          }
+        },
+        statGrowth: [{
+          playerId,
+          playerName: "Test Player",
+          matchXp: 999,
+          trainingXp: 0,
+          statGrowth: [{ statKey: "CRO", from: 3, to: 4, source: "match" as const, matchId: result.playerMatchId }],
+          notes: []
+        }]
+      }
+    };
+
+    const summary = getMatchDevelopmentSummary(result.gameState, match);
+
+    expect(summary.topXpGainers[0].playerId).toBe(playerId);
+    expect(summary.topXpGainers[0].statIncreaseBadges).toEqual(["+1 CRO"]);
+  });
 });
