@@ -5,6 +5,9 @@ export type OutfieldStats = {
   CRO: number;
   HEA: number;
   ACC: number;
+  STA: number;
+  DRI: number;
+  POS: number;
   TEC: number;
   PHY: number;
   MEN: number;
@@ -130,6 +133,9 @@ export const outfieldStatKeys = [
   "CRO",
   "HEA",
   "ACC",
+  "STA",
+  "DRI",
+  "POS",
   "TEC",
   "PHY",
   "MEN"

@@ -1,4 +1,3 @@
-import { chanceTypeBaseWeights } from "../../data/constants/formations";
 import { createId, pickOne, randomInt, type RandomSource } from "../../utils/random";
 import { clamp, roundTo } from "../../utils/math";
 import type { Club } from "../types/club";
@@ -10,15 +9,28 @@ import type {
   MatchRewards,
   MatchTeamStats
 } from "../types/match";
-import { isGoalkeeperStats, type OutfieldStats, type Player } from "../types/player";
+import { isGoalkeeperStats, type Player, type PlayerPosition } from "../types/player";
 import type { Lineup, Tactic } from "../types/tactics";
 import type { GameState } from "../types/game";
-import { calculatePhaseStrengths, type PhaseStrengths } from "./calculatePhaseStrengths";
+import { calculatePhaseStrengths } from "./calculatePhaseStrengths";
 import { goalProbability } from "./goalProbability";
 import { generateMatchReport } from "./generateMatchReport";
 import { calculateMatchRewards } from "../rewards/calculateMatchRewards";
 import { aggregatePlayerMatchStats } from "./playerMatchStats";
 import { calculatePlayerMatchRatings } from "./playerMatchRatings";
+import {
+  calculateChanceCreationChance,
+  calculateChanceQualityMultiplier,
+  getEventVolumeModifier,
+  getTacticVolatility,
+  pickWeightedChanceType
+} from "./tacticalMatchEffects";
+import {
+  duelModifier,
+  recipesForChanceType,
+  scorePlayerDuel,
+  scoreTeamDuel
+} from "./contextualDuels";
 
 type SimulateMatchOptions = {
   fixture: Fixture;
@@ -34,6 +46,10 @@ type SimulateMatchOptions = {
 };
 
 type MutableMatchStats = MatchTeamStats;
+type StarterCandidate = {
+  player: Player;
+  slotPosition: PlayerPosition;
+};
 
 const chanceTypeDescriptions: Record<ChanceType, string> = {
   fast_breakaway: "fast breakaway",
@@ -61,79 +77,77 @@ function createEmptyStats(): MatchTeamStats {
   };
 }
 
-function riskEventModifier(tactic: Tactic): number {
-  if (tactic.riskLevel === "aggressive") return 4;
-  if (tactic.riskLevel === "conservative") return -2;
-  return 0;
-}
-
-function chanceCreationModifier(tactic: Tactic): number {
-  if (tactic.riskLevel === "aggressive") return 0.05;
-  if (tactic.riskLevel === "conservative") return -0.03;
-  return 0;
-}
-
 function getOutfieldStarters(lineup: Lineup, gameState: GameState): Player[] {
   return lineup.starters
     .map((slot) => gameState.players[slot.playerId])
     .filter((player) => player && !isGoalkeeperStats(player.currentStats));
 }
 
-function average(values: number[]): number {
-  if (values.length === 0) return 1;
-  return values.reduce((sum, value) => sum + value, 0) / values.length;
+function getOutfieldStarterCandidates(lineup: Lineup, gameState: GameState): StarterCandidate[] {
+  return lineup.starters
+    .map((slot) => ({ player: gameState.players[slot.playerId], slotPosition: slot.position }))
+    .filter(({ player }) => player && !isGoalkeeperStats(player.currentStats));
 }
 
-function chanceTypeSkill(player: Player, chanceType: ChanceType): number {
+function chanceTypeSkill(
+  player: Player,
+  chanceType: ChanceType,
+  tactic?: Tactic,
+  minute = 1,
+  slotPosition?: PlayerPosition
+): number {
   if (isGoalkeeperStats(player.currentStats)) return 1;
-  const stats = player.currentStats;
+  const recipe = recipesForChanceType(chanceType).attack;
 
-  if (chanceType === "fast_breakaway") return average([stats.ACC, stats.TEC, stats.SHO]);
-  if (chanceType === "wide_cross") return average([stats.CRO, stats.HEA, stats.PHY]);
-  if (chanceType === "rebound_big_chance") return average([stats.SHO, stats.ACC, stats.MEN]);
-  return average([stats.PAS, stats.TEC, stats.SHO]);
+  return scorePlayerDuel({
+    player,
+    recipe,
+    tactic: tactic ?? { id: "fallback", name: "Fallback", formation: "4-4-2", focus: "balanced", riskLevel: "balanced", instructions: [] },
+    minute,
+    slotPosition
+  });
 }
 
 function pickAttacker(
   lineup: Lineup,
   gameState: GameState,
   chanceType: ChanceType,
+  tactic: Tactic,
+  minute: number,
   rng: RandomSource
 ): Player {
-  const candidates = getOutfieldStarters(lineup, gameState).sort(
-    (a, b) => chanceTypeSkill(b, chanceType) - chanceTypeSkill(a, chanceType)
+  const candidates = getOutfieldStarterCandidates(lineup, gameState).sort(
+    (a, b) =>
+      chanceTypeSkill(b.player, chanceType, tactic, minute, b.slotPosition) -
+      chanceTypeSkill(a.player, chanceType, tactic, minute, a.slotPosition)
   );
   const topCandidates = candidates.slice(0, Math.min(4, candidates.length));
-  return pickOne(topCandidates, rng);
+  return pickOne(topCandidates, rng).player;
 }
 
 function pickChanceCreator(
   lineup: Lineup,
   shooter: Player | undefined,
   gameState: GameState,
-  chanceType: ChanceType
+  chanceType: ChanceType,
+  tactic: Tactic,
+  minute: number
 ): Player | undefined {
-  const outfieldPlayers = getOutfieldStarters(lineup, gameState).filter((player) => player.id !== shooter?.id);
-  if (outfieldPlayers.length === 0) return shooter;
+  const recipe =
+    chanceType === "fast_breakaway"
+      ? recipesForChanceType(chanceType).attack
+      : chanceType === "wide_cross"
+        ? recipesForChanceType(chanceType).attack
+        : { PAS: 1.25, TEC: 1.1, POS: 1, DRI: 0.7, MEN: 0.8 };
+  const candidates = getOutfieldStarterCandidates(lineup, gameState)
+    .filter(({ player }) => player.id !== shooter?.id)
+    .sort((a, b) =>
+      scorePlayerDuel({ player: b.player, recipe, tactic, minute, slotPosition: b.slotPosition }) -
+      scorePlayerDuel({ player: a.player, recipe, tactic, minute, slotPosition: a.slotPosition })
+    );
+  if (candidates.length === 0) return shooter;
 
-  const candidates = outfieldPlayers.sort((a, b) => {
-    if (isGoalkeeperStats(a.currentStats) || isGoalkeeperStats(b.currentStats)) return 0;
-    const scoreA =
-      chanceType === "wide_cross"
-        ? average([a.currentStats.CRO, a.currentStats.PAS, a.currentStats.TEC])
-        : chanceType === "fast_breakaway"
-          ? average([a.currentStats.ACC, a.currentStats.PAS, a.currentStats.TEC])
-          : average([a.currentStats.PAS, a.currentStats.TEC, a.currentStats.MEN]);
-    const scoreB =
-      chanceType === "wide_cross"
-        ? average([b.currentStats.CRO, b.currentStats.PAS, b.currentStats.TEC])
-        : chanceType === "fast_breakaway"
-          ? average([b.currentStats.ACC, b.currentStats.PAS, b.currentStats.TEC])
-          : average([b.currentStats.PAS, b.currentStats.TEC, b.currentStats.MEN]);
-    return scoreB - scoreA;
-  });
-
-  return candidates[0];
+  return candidates[0].player;
 }
 
 function pickGoalkeeper(lineup: Lineup, gameState: GameState): Player | undefined {
@@ -142,62 +156,42 @@ function pickGoalkeeper(lineup: Lineup, gameState: GameState): Player | undefine
     .find((player) => player && isGoalkeeperStats(player.currentStats));
 }
 
-function pickDefensivePlayer(lineup: Lineup, gameState: GameState, rng: RandomSource): Player | undefined {
+function pickDefensivePlayer(
+  lineup: Lineup,
+  gameState: GameState,
+  rng: RandomSource,
+  tactic?: Tactic,
+  minute = 1,
+  chanceType: ChanceType = "sustained_pressure"
+): Player | undefined {
+  const recipe = recipesForChanceType(chanceType).defence;
   const candidates = lineup.starters
     .filter((slot) => ["CB", "LB", "RB", "WB", "DM", "CM"].includes(slot.position))
-    .map((slot) => gameState.players[slot.playerId])
-    .filter(Boolean);
+    .map((slot) => ({ player: gameState.players[slot.playerId], slotPosition: slot.position }))
+    .filter(({ player }) => player && !isGoalkeeperStats(player.currentStats))
+    .sort((a, b) =>
+      scorePlayerDuel({
+        player: b.player,
+        recipe,
+        tactic: tactic ?? { id: "fallback", name: "Fallback", formation: "4-4-2", focus: "balanced", riskLevel: "balanced", instructions: [] },
+        minute,
+        slotPosition: b.slotPosition
+      }) -
+      scorePlayerDuel({
+        player: a.player,
+        recipe,
+        tactic: tactic ?? { id: "fallback", name: "Fallback", formation: "4-4-2", focus: "balanced", riskLevel: "balanced", instructions: [] },
+        minute,
+        slotPosition: a.slotPosition
+      })
+    );
 
   if (candidates.length === 0) return undefined;
-  return pickOne(candidates, rng);
+  return pickOne(candidates.slice(0, Math.min(4, candidates.length)), rng).player;
 }
 
 function goalkeeperStrengthWithPressure(strength: number, pressure: number): number {
   return strength * (1 - Math.min(pressure * 0.02, 0.15));
-}
-
-function weightedPickChanceType(tactic: Tactic, rng: RandomSource): ChanceType {
-  const weights = { ...chanceTypeBaseWeights };
-
-  if (tactic.formation === "4-4-2") {
-    weights.wide_cross += 0.35;
-    weights.rebound_big_chance += 0.08;
-  }
-  if (tactic.formation === "4-3-3") {
-    weights.wide_cross += 0.35;
-    weights.sustained_pressure += 0.2;
-    weights.fast_breakaway += 0.1;
-  }
-  if (tactic.formation === "4-2-3-1") {
-    weights.sustained_pressure += 0.35;
-  }
-  if (tactic.formation === "3-5-2") {
-    weights.sustained_pressure += 0.35;
-    weights.wide_cross += 0.15;
-  }
-  if (tactic.formation === "5-4-1") {
-    weights.fast_breakaway += 0.35;
-    weights.sustained_pressure -= 0.15;
-  }
-
-  if (tactic.focus === "wide_play") weights.wide_cross += 0.6;
-  if (tactic.focus === "fast_breaks") weights.fast_breakaway += 0.6;
-  if (tactic.focus === "sustained_pressure") weights.sustained_pressure += 0.6;
-  if (tactic.focus === "defensive_shape") weights.fast_breakaway += 0.2;
-
-  const entries = Object.entries(weights).map(([chanceType, weight]) => ({
-    chanceType: chanceType as ChanceType,
-    weight: Math.max(weight, 0.05)
-  }));
-  const totalWeight = entries.reduce((sum, entry) => sum + entry.weight, 0);
-  let roll = rng() * totalWeight;
-
-  for (const entry of entries) {
-    roll -= entry.weight;
-    if (roll <= 0) return entry.chanceType;
-  }
-
-  return "sustained_pressure";
 }
 
 function baseXgForChanceType(chanceType: ChanceType, rng: RandomSource): number {
@@ -207,30 +201,21 @@ function baseXgForChanceType(chanceType: ChanceType, rng: RandomSource): number 
   return 0.1 + rng() * 0.15;
 }
 
-function chanceCreationChance(
-  attackingPhase: PhaseStrengths,
-  defendingPhase: PhaseStrengths,
-  tactic: Tactic
-): number {
-  return clamp(
-    0.22 + (attackingPhase.attack - defendingPhase.defence) * 0.025 + chanceCreationModifier(tactic),
-    0.08,
-    0.5
-  );
-}
-
 function addShotOutcome(options: {
   events: MatchEvent[];
   stats: MutableMatchStats;
   opponentStats: MutableMatchStats;
   attackingClub: Club;
   attackingLineup: Lineup;
+  attackingTactic: Tactic;
   defendingClub: Club;
   defendingLineup: Lineup;
+  defendingTactic: Tactic;
   defendingGoalkeeperStrength: number;
   goalkeeperPressure: number;
   minute: number;
   chanceType: ChanceType;
+  duelQualityModifier: number;
   gameState: GameState;
   rng: RandomSource;
 }): boolean {
@@ -240,20 +225,34 @@ function addShotOutcome(options: {
     opponentStats,
     attackingClub,
     attackingLineup,
+    attackingTactic,
     defendingClub,
     defendingLineup,
+    defendingTactic,
     defendingGoalkeeperStrength,
     goalkeeperPressure,
     minute,
     chanceType,
+    duelQualityModifier,
     gameState,
     rng
   } = options;
-  const attacker = pickAttacker(attackingLineup, gameState, chanceType, rng);
-  const creator = pickChanceCreator(attackingLineup, attacker, gameState, chanceType) ?? attacker;
+  const attacker = pickAttacker(attackingLineup, gameState, chanceType, attackingTactic, minute, rng);
+  const creator = pickChanceCreator(attackingLineup, attacker, gameState, chanceType, attackingTactic, minute) ?? attacker;
   const defendingGoalkeeper = pickGoalkeeper(defendingLineup, gameState);
-  const baseXg = baseXgForChanceType(chanceType, rng);
-  const attackerSkill = chanceTypeSkill(attacker, chanceType);
+  const attackerSlot = attackingLineup.starters.find((slot) => slot.playerId === attacker.id)?.position;
+  const creatorSlot = attackingLineup.starters.find((slot) => slot.playerId === creator.id)?.position;
+  const attackerSkill = chanceTypeSkill(attacker, chanceType, attackingTactic, minute, attackerSlot);
+  const creatorSkill = chanceTypeSkill(creator, chanceType, attackingTactic, minute, creatorSlot);
+  const qualityMultiplier = calculateChanceQualityMultiplier({
+    chanceType,
+    attackingTactic,
+    defendingTactic,
+    attackerSkill,
+    creatorSkill,
+    duelQualityModifier
+  });
+  const baseXg = baseXgForChanceType(chanceType, rng) * qualityMultiplier;
   const effectiveGoalkeeper = goalkeeperStrengthWithPressure(defendingGoalkeeperStrength, goalkeeperPressure);
   const goalChance = goalProbability(baseXg, attackerSkill, effectiveGoalkeeper);
   const scored = rng() < goalChance;
@@ -344,10 +343,16 @@ export function simulateMatch({
   const awayPhase = calculatePhaseStrengths(awayClub, gameState, awayLineup, awayTactic, false);
   let homeGoalkeeperPressure = 0;
   let awayGoalkeeperPressure = 0;
+  const volatilitySwing = Math.round(
+    Math.abs(getTacticVolatility(homeTactic) + getTacticVolatility(awayTactic)) * 35
+  );
   const totalEvents = clamp(
-    randomInt(20, 40, rng) + riskEventModifier(homeTactic) + riskEventModifier(awayTactic),
-    16,
-    48
+    randomInt(20, 40, rng) +
+      getEventVolumeModifier(homeTactic) +
+      getEventVolumeModifier(awayTactic) +
+      (volatilitySwing > 0 ? randomInt(-volatilitySwing, volatilitySwing, rng) : 0),
+    14,
+    52
   );
 
   for (let eventIndex = 0; eventIndex < totalEvents; eventIndex += 1) {
@@ -368,10 +373,18 @@ export function simulateMatch({
     const defendingLineup = homeControls ? awayLineup : homeLineup;
     const defendingGoalkeeperStrength = homeControls ? awayPhase.goalkeeper : homePhase.goalkeeper;
     const attackingTactic = homeControls ? homeTactic : awayTactic;
+    const defendingTactic = homeControls ? awayTactic : homeTactic;
     const goalkeeperPressure = homeControls ? awayGoalkeeperPressure : homeGoalkeeperPressure;
 
     attackingStats.eventsWon += 1;
-    const controlPlayer = pickChanceCreator(attackingLineup, undefined, gameState, "sustained_pressure");
+    const controlPlayer = pickChanceCreator(
+      attackingLineup,
+      undefined,
+      gameState,
+      "sustained_pressure",
+      attackingTactic,
+      minute
+    );
     events.push({
       minute,
       type: "event_control",
@@ -380,10 +393,36 @@ export function simulateMatch({
       description: `${attackingClub.name} gain control in midfield.`
     });
 
-    const chanceCreated = rng() <= chanceCreationChance(attackingPhase, defendingPhase, attackingTactic);
+    const chanceType = pickWeightedChanceType(attackingTactic, defendingTactic, rng);
+    const recipes = recipesForChanceType(chanceType);
+    const attackingDuelScore = scoreTeamDuel({
+      lineup: attackingLineup,
+      gameState,
+      recipe: recipes.attack,
+      tactic: attackingTactic,
+      minute,
+      preferredSlots: chanceType === "wide_cross" ? ["WB", "LW", "RW", "LB", "RB"] : chanceType === "fast_breakaway" ? ["ST", "LW", "RW", "AM"] : undefined
+    });
+    const defendingDuelScore = scoreTeamDuel({
+      lineup: defendingLineup,
+      gameState,
+      recipe: recipes.defence,
+      tactic: defendingTactic,
+      minute,
+      preferredSlots: chanceType === "wide_cross" ? ["WB", "LB", "RB", "CB"] : chanceType === "fast_breakaway" ? ["CB", "LB", "RB", "DM"] : undefined
+    });
+    const chanceDuelModifier = duelModifier(attackingDuelScore, defendingDuelScore);
+    const chanceCreated =
+      rng() <= calculateChanceCreationChance(
+        attackingPhase,
+        defendingPhase,
+        attackingTactic,
+        defendingTactic,
+        chanceDuelModifier
+      );
     if (!chanceCreated) {
       if (rng() < 0.35) {
-        const defender = pickDefensivePlayer(defendingLineup, gameState, rng);
+        const defender = pickDefensivePlayer(defendingLineup, gameState, rng, defendingTactic, minute, chanceType);
         if (defender) {
           events.push({
             minute,
@@ -398,7 +437,6 @@ export function simulateMatch({
       continue;
     }
 
-    const chanceType = weightedPickChanceType(attackingTactic, rng);
     attackingStats.chancesCreated += 1;
     attackingStats.chanceTypeBreakdown[chanceType] += 1;
 
@@ -408,12 +446,15 @@ export function simulateMatch({
       opponentStats: defendingStats,
       attackingClub,
       attackingLineup,
+      attackingTactic,
       defendingClub,
       defendingLineup,
+      defendingTactic,
       defendingGoalkeeperStrength,
       goalkeeperPressure,
       minute,
       chanceType,
+      duelQualityModifier: chanceDuelModifier,
       gameState,
       rng
     });
@@ -430,7 +471,7 @@ export function simulateMatch({
         minute: clamp(minute + 1, 1, 90),
         type: "rebound",
         clubId: attackingClub.id,
-        playerId: pickAttacker(attackingLineup, gameState, "rebound_big_chance", rng).id,
+        playerId: pickAttacker(attackingLineup, gameState, "rebound_big_chance", attackingTactic, clamp(minute + 1, 1, 90), rng).id,
         description: `${attackingClub.name} win the rebound inside the box.`,
         chanceType: "rebound_big_chance",
         outcome: "created"
@@ -441,12 +482,32 @@ export function simulateMatch({
         opponentStats: defendingStats,
         attackingClub,
         attackingLineup,
+        attackingTactic,
         defendingClub,
         defendingLineup,
+        defendingTactic,
         defendingGoalkeeperStrength,
         goalkeeperPressure: goalkeeperPressure + 2,
         minute: clamp(minute + 1, 1, 90),
         chanceType: "rebound_big_chance",
+        duelQualityModifier: duelModifier(
+          scoreTeamDuel({
+            lineup: attackingLineup,
+            gameState,
+            recipe: recipesForChanceType("rebound_big_chance").attack,
+            tactic: attackingTactic,
+            minute: clamp(minute + 1, 1, 90),
+            preferredSlots: ["ST", "AM", "LW", "RW"]
+          }),
+          scoreTeamDuel({
+            lineup: defendingLineup,
+            gameState,
+            recipe: recipesForChanceType("rebound_big_chance").defence,
+            tactic: defendingTactic,
+            minute: clamp(minute + 1, 1, 90),
+            preferredSlots: ["CB", "LB", "RB", "DM"]
+          })
+        ),
         gameState,
         rng
       });

@@ -83,15 +83,15 @@ function statWithProfile(
   const base = randomInt(statRange.typicalCurrentMin, statRange.typicalCurrentMax, rng);
   const boosts: Partial<Record<PlayerPosition, Partial<Record<keyof OutfieldStats, number>>>> = {
     CB: { TAC: 2, HEA: 2, PHY: 1 },
-    LB: { TAC: 1, ACC: 1, CRO: 1 },
-    RB: { TAC: 1, ACC: 1, CRO: 1 },
-    WB: { ACC: 2, CRO: 2, PHY: 1 },
-    DM: { TAC: 2, PAS: 1, MEN: 1 },
-    CM: { PAS: 2, TEC: 1, MEN: 1 },
-    AM: { PAS: 2, TEC: 2, SHO: 1 },
-    LW: { ACC: 2, CRO: 1, TEC: 1 },
-    RW: { ACC: 2, CRO: 1, TEC: 1 },
-    ST: { SHO: 2, ACC: 1, HEA: 1 }
+    LB: { TAC: 1, ACC: 1, CRO: 1, POS: 1 },
+    RB: { TAC: 1, ACC: 1, CRO: 1, POS: 1 },
+    WB: { ACC: 2, CRO: 2, STA: 2, DRI: 1 },
+    DM: { TAC: 2, PAS: 1, MEN: 1, POS: 2, STA: 1 },
+    CM: { PAS: 2, TEC: 1, MEN: 1, POS: 1, STA: 1 },
+    AM: { PAS: 2, TEC: 2, SHO: 1, DRI: 1, POS: 1 },
+    LW: { ACC: 2, CRO: 1, TEC: 1, DRI: 2 },
+    RW: { ACC: 2, CRO: 1, TEC: 1, DRI: 2 },
+    ST: { SHO: 2, ACC: 1, HEA: 1, POS: 2, DRI: 1 }
   };
 
   return clampStat(

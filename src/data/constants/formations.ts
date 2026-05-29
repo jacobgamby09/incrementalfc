@@ -2,14 +2,25 @@ import type { Formation, TacticalFocus } from "../../domain/types/tactics";
 import type { ChanceType } from "../../domain/types/match";
 import type { PlayerPosition } from "../../domain/types/player";
 
-export const formations: Formation[] = ["4-4-2", "4-3-3", "4-2-3-1", "3-5-2", "5-4-1"];
+export const formations: Formation[] = [
+  "4-4-2",
+  "4-3-3",
+  "4-2-3-1",
+  "3-5-2",
+  "5-4-1",
+  "5-3-2",
+  "3-4-3",
+  "3-4-2-1"
+];
 
 export const tacticalFocuses: TacticalFocus[] = [
   "balanced",
   "wide_play",
   "fast_breaks",
   "sustained_pressure",
-  "defensive_shape"
+  "defensive_shape",
+  "control",
+  "tiki_taka"
 ];
 
 export const formationSlots: Record<Formation, PlayerPosition[]> = {
@@ -17,7 +28,10 @@ export const formationSlots: Record<Formation, PlayerPosition[]> = {
   "4-3-3": ["GK", "RB", "CB", "CB", "LB", "DM", "CM", "CM", "LW", "RW", "ST"],
   "4-2-3-1": ["GK", "RB", "CB", "CB", "LB", "DM", "CM", "LW", "AM", "RW", "ST"],
   "3-5-2": ["GK", "CB", "CB", "CB", "WB", "DM", "CM", "CM", "WB", "ST", "ST"],
-  "5-4-1": ["GK", "RB", "CB", "CB", "CB", "LB", "CM", "CM", "LW", "RW", "ST"]
+  "5-4-1": ["GK", "RB", "CB", "CB", "CB", "LB", "CM", "CM", "LW", "RW", "ST"],
+  "5-3-2": ["GK", "RB", "CB", "CB", "CB", "LB", "DM", "CM", "CM", "ST", "ST"],
+  "3-4-3": ["GK", "CB", "CB", "CB", "WB", "CM", "CM", "WB", "LW", "RW", "ST"],
+  "3-4-2-1": ["GK", "CB", "CB", "CB", "WB", "CM", "CM", "WB", "AM", "AM", "ST"]
 };
 
 export type PitchCoordinate = {
@@ -90,6 +104,45 @@ export const formationPitchCoordinates: Record<Formation, PitchCoordinate[]> = {
     { x: 14, y: 38 },
     { x: 86, y: 38 },
     { x: 50, y: 13 }
+  ],
+  "5-3-2": [
+    { x: 50, y: 92 },
+    { x: 90, y: 73 },
+    { x: 70, y: 78 },
+    { x: 50, y: 80 },
+    { x: 30, y: 78 },
+    { x: 10, y: 73 },
+    { x: 50, y: 56 },
+    { x: 34, y: 43 },
+    { x: 66, y: 43 },
+    { x: 40, y: 15 },
+    { x: 60, y: 15 }
+  ],
+  "3-4-3": [
+    { x: 50, y: 92 },
+    { x: 28, y: 76 },
+    { x: 50, y: 78 },
+    { x: 72, y: 76 },
+    { x: 12, y: 50 },
+    { x: 38, y: 50 },
+    { x: 62, y: 50 },
+    { x: 88, y: 50 },
+    { x: 16, y: 18 },
+    { x: 84, y: 18 },
+    { x: 50, y: 12 }
+  ],
+  "3-4-2-1": [
+    { x: 50, y: 92 },
+    { x: 28, y: 76 },
+    { x: 50, y: 78 },
+    { x: 72, y: 76 },
+    { x: 12, y: 52 },
+    { x: 38, y: 53 },
+    { x: 62, y: 53 },
+    { x: 88, y: 52 },
+    { x: 36, y: 28 },
+    { x: 64, y: 28 },
+    { x: 50, y: 12 }
   ]
 };
 

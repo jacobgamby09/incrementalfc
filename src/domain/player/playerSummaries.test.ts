@@ -135,9 +135,9 @@ function addRatedMatches(gameState: GameState, playerId: string, ratings: number
 describe("player summaries", () => {
   it("calculates OVR from position-relevant current stats", () => {
     const striker = generatePlayer({ clubId: "c", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9 });
-    striker.currentStats = { PAS: 1, SHO: 10, TAC: 1, CRO: 1, HEA: 9, ACC: 10, TEC: 10, PHY: 1, MEN: 8 };
+    striker.currentStats = { PAS: 1, SHO: 10, TAC: 1, CRO: 1, HEA: 9, ACC: 10, STA: 6, DRI: 9, POS: 10, TEC: 10, PHY: 1, MEN: 8 };
     const centreBack = generatePlayer({ clubId: "c", position: "CB", statRange: lowestLeagueStatRange, kitNumber: 5 });
-    centreBack.currentStats = { PAS: 1, SHO: 1, TAC: 10, CRO: 1, HEA: 10, ACC: 2, TEC: 1, PHY: 10, MEN: 8 };
+    centreBack.currentStats = { PAS: 1, SHO: 1, TAC: 10, CRO: 1, HEA: 10, ACC: 2, STA: 7, DRI: 1, POS: 10, TEC: 1, PHY: 10, MEN: 8 };
     const goalkeeper = generatePlayer({ clubId: "c", position: "GK", statRange: lowestLeagueStatRange, kitNumber: 1 });
     goalkeeper.currentStats = { REF: 10, HAN: 9, DIS: 8, TEC: 1, PHY: 1, MEN: 8 };
 
@@ -148,11 +148,26 @@ describe("player summaries", () => {
 
   it("calculates POT from potential stats rather than current stats", () => {
     const player = generatePlayer({ clubId: "c", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9 });
-    player.currentStats = { PAS: 1, SHO: 1, TAC: 1, CRO: 1, HEA: 1, ACC: 1, TEC: 1, PHY: 1, MEN: 1 };
-    player.potentialStats = { PAS: 10, SHO: 10, TAC: 10, CRO: 10, HEA: 10, ACC: 10, TEC: 10, PHY: 10, MEN: 10 };
+    player.currentStats = { PAS: 1, SHO: 1, TAC: 1, CRO: 1, HEA: 1, ACC: 1, STA: 1, DRI: 1, POS: 1, TEC: 1, PHY: 1, MEN: 1 };
+    player.potentialStats = { PAS: 10, SHO: 10, TAC: 10, CRO: 10, HEA: 10, ACC: 10, STA: 10, DRI: 10, POS: 10, TEC: 10, PHY: 10, MEN: 10 };
 
     expect(calculatePlayerOvr(player)).toBe(1);
     expect(calculatePlayerPot(player)).toBe(10);
+  });
+
+  it("changes OVR when new role-relevant stats change", () => {
+    const winger = generatePlayer({ clubId: "c", position: "LW", statRange: lowestLeagueStatRange, kitNumber: 11 });
+    winger.currentStats = { PAS: 5, SHO: 5, TAC: 5, CRO: 7, HEA: 5, ACC: 8, STA: 5, DRI: 3, POS: 5, TEC: 7, PHY: 5, MEN: 5 };
+    const lowDribblingOvr = calculatePlayerOvr(winger);
+    winger.currentStats = { ...winger.currentStats, DRI: 10 };
+
+    const centreBack = generatePlayer({ clubId: "c", position: "CB", statRange: lowestLeagueStatRange, kitNumber: 5 });
+    centreBack.currentStats = { PAS: 5, SHO: 5, TAC: 8, CRO: 5, HEA: 8, ACC: 5, STA: 5, DRI: 5, POS: 3, TEC: 5, PHY: 8, MEN: 7 };
+    const lowPositioningOvr = calculatePlayerOvr(centreBack);
+    centreBack.currentStats = { ...centreBack.currentStats, POS: 10 };
+
+    expect(calculatePlayerOvr(winger)).toBeGreaterThan(lowDribblingOvr);
+    expect(calculatePlayerOvr(centreBack)).toBeGreaterThan(lowPositioningOvr);
   });
 
   it("returns last five form ratings newest first and season averages safely", () => {

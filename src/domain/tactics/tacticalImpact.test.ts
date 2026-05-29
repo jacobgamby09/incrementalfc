@@ -14,6 +14,8 @@ describe("tactical impact", () => {
     for (const focus of tacticalFocuses) {
       expect(focusImpact[focus].benefits.length).toBeGreaterThan(0);
       expect(focusImpact[focus].tradeoffs.length).toBeGreaterThan(0);
+      expect(focusImpact[focus].primaryStats.length).toBeGreaterThan(0);
+      expect(focusImpact[focus].likelyChanceTypes.length).toBeGreaterThan(0);
     }
     for (const riskLevel of riskLevels) {
       expect(riskImpact[riskLevel].benefits.length).toBeGreaterThan(0);
@@ -36,5 +38,12 @@ describe("tactical impact", () => {
       "Wide Play",
       "Aggressive Risk"
     ]);
+  });
+
+  it("includes the new control and tiki-taka tactical identities", () => {
+    expect(focusImpact.control.benefits.join(" ")).toContain("midfield control");
+    expect(focusImpact.control.tradeoffs.join(" ")).toContain("explosive");
+    expect(focusImpact.tiki_taka.primaryStats).toEqual(expect.arrayContaining(["PAS", "TEC", "MEN"]));
+    expect(focusImpact.tiki_taka.likelyChanceTypes).toContain("sustained_pressure");
   });
 });

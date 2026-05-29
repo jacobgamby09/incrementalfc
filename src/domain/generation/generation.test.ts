@@ -72,6 +72,33 @@ describe("generated world", () => {
     }
   });
 
+  it("generates stamina, dribbling, and positioning for outfield players only", () => {
+    const winger = generatePlayer({
+      clubId: "club_test",
+      position: "LW",
+      statRange: lowestLeagueStatRange
+    });
+    const goalkeeper = generatePlayer({
+      clubId: "club_test",
+      position: "GK",
+      statRange: lowestLeagueStatRange
+    });
+
+    expect(winger.currentStats).toMatchObject({
+      STA: expect.any(Number),
+      DRI: expect.any(Number),
+      POS: expect.any(Number)
+    });
+    expect(winger.potentialStats).toMatchObject({
+      STA: expect.any(Number),
+      DRI: expect.any(Number),
+      POS: expect.any(Number)
+    });
+    expect("STA" in goalkeeper.currentStats).toBe(false);
+    expect("DRI" in goalkeeper.currentStats).toBe(false);
+    expect("POS" in goalkeeper.currentStats).toBe(false);
+  });
+
   it("adds visual identity to every generated club", () => {
     const gameState = generateGameState();
 

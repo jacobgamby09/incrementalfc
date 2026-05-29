@@ -120,7 +120,7 @@ export function SquadPreview({
 
   function sortMark(column: string): string {
     if (sort.column !== column) return "";
-    return sort.direction === "asc" ? " ?" : " ?";
+    return sort.direction === "asc" ? " ^" : " v";
   }
 
   return (
@@ -189,14 +189,28 @@ export function SquadPreview({
             <tr className="border-b border-stone-300 text-xs uppercase text-stone-500">
               {selectedPreset.columns.map((column) => (
                 <th key={column} className="px-3 py-2 font-semibold first:pl-0 last:pr-0">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort(column)}
-                    className="font-semibold underline-offset-2 hover:underline"
-                    title={statTooltip(column)}
-                  >
-                    {getStatDefinition(column) ? <StatLabel code={column} /> : column}{sortMark(column)}
-                  </button>
+                  {getStatDefinition(column) ? (
+                    <span className="inline-flex items-center gap-1" title={statTooltip(column)}>
+                      <StatLabel code={column} />
+                      <button
+                        type="button"
+                        onClick={() => toggleSort(column)}
+                        className="font-semibold underline-offset-2 hover:underline"
+                        aria-label={`Sort by ${column}`}
+                      >
+                        {sortMark(column)}
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => toggleSort(column)}
+                      className="font-semibold underline-offset-2 hover:underline"
+                      title={statTooltip(column)}
+                    >
+                      {column}{sortMark(column)}
+                    </button>
+                  )}
                 </th>
               ))}
             </tr>

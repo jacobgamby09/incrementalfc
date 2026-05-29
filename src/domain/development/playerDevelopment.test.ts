@@ -42,8 +42,8 @@ describe("player development", () => {
 
   it("prevents stat growth above personal potential and facility cap", () => {
     const player = generatePlayer({ clubId: "club", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9 });
-    player.currentStats = { PAS: 5, SHO: 9, TAC: 5, CRO: 5, HEA: 5, ACC: 5, TEC: 5, PHY: 5, MEN: 5 };
-    player.potentialStats = { PAS: 5, SHO: 12, TAC: 5, CRO: 5, HEA: 5, ACC: 5, TEC: 5, PHY: 5, MEN: 5 };
+    player.currentStats = { PAS: 5, SHO: 9, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
+    player.potentialStats = { PAS: 5, SHO: 12, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
 
     const developed = applyDevelopmentXp({ player, xpGained: 1000, developmentCap: 10, source: "training" });
 
@@ -56,8 +56,8 @@ describe("player development", () => {
     const gameState = generateGameState();
     const club = gameState.clubs[gameState.playerClubId];
     const player = gameState.players[club.squadPlayerIds.find((playerId) => gameState.players[playerId].primaryPosition === "ST")!];
-    player.currentStats = { PAS: 5, SHO: 10, TAC: 5, CRO: 5, HEA: 5, ACC: 5, TEC: 5, PHY: 5, MEN: 5 };
-    player.potentialStats = { PAS: 5, SHO: 14, TAC: 5, CRO: 5, HEA: 5, ACC: 5, TEC: 5, PHY: 5, MEN: 5 };
+    player.currentStats = { PAS: 5, SHO: 10, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
+    player.potentialStats = { PAS: 5, SHO: 14, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
 
     const summary = getPlayerDevelopmentSummary(player, club);
 

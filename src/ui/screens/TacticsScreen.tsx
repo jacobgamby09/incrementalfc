@@ -173,6 +173,30 @@ export function TacticsScreen({
                   <li key={tradeoff}>{tradeoff}</li>
                 ))}
               </ul>
+              {impact.primaryStats.length > 0 && (
+                <>
+                  <p className="mt-3 text-xs font-semibold uppercase text-stone-500">Primary Stats</p>
+                  <p className="mt-1 text-stone-700">{impact.primaryStats.join(", ")}</p>
+                </>
+              )}
+              {impact.likelyChanceTypes.length > 0 && (
+                <>
+                  <p className="mt-3 text-xs font-semibold uppercase text-stone-500">Likely Chances</p>
+                  <p className="mt-1 text-stone-700 capitalize">
+                    {impact.likelyChanceTypes.map((chanceType) => optionLabel(chanceType)).join(", ")}
+                  </p>
+                </>
+              )}
+              {impact.vulnerabilities.length > 0 && (
+                <>
+                  <p className="mt-3 text-xs font-semibold uppercase text-stone-500">Vulnerabilities</p>
+                  <ul className="mt-1 space-y-1 text-stone-700">
+                    {impact.vulnerabilities.map((vulnerability) => (
+                      <li key={vulnerability}>{vulnerability}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </div>
           ))}
         </div>

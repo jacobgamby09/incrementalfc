@@ -3,6 +3,10 @@ import { formationPitchCoordinates, formationSlots, formations } from "../../dat
 import { getOverlappingPitchCoordinates } from "./pitchLayout";
 
 describe("pitch layout", () => {
+  it("includes the expanded formation set", () => {
+    expect(formations).toEqual(expect.arrayContaining(["5-3-2", "3-4-3", "3-4-2-1"]));
+  });
+
   it("defines non-overlapping coordinates for every formation slot", () => {
     for (const formation of formations) {
       const coordinates = formationPitchCoordinates[formation];

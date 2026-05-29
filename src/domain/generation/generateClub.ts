@@ -5,6 +5,7 @@ import type { Player, PlayerPosition } from "../types/player";
 import type { ClubTactics, Formation, RiskLevel, TacticalFocus, Tactic } from "../types/tactics";
 import { createId, pickOne, randomInt, type RandomSource } from "../../utils/random";
 import { generatePlayer } from "./generatePlayer";
+import { formations, tacticalFocuses } from "../../data/constants/formations";
 
 const squadTemplate: PlayerPosition[] = [
   "GK",
@@ -27,14 +28,6 @@ const squadTemplate: PlayerPosition[] = [
   "CB"
 ];
 
-const formations: Formation[] = ["4-4-2", "4-3-3", "4-2-3-1", "3-5-2", "5-4-1"];
-const focuses: TacticalFocus[] = [
-  "balanced",
-  "wide_play",
-  "fast_breaks",
-  "sustained_pressure",
-  "defensive_shape"
-];
 const riskLevels: RiskLevel[] = ["conservative", "balanced", "aggressive"];
 const kitStyles: ClubKitStyle[] = ["classic", "sash", "stripes", "hoops", "quarters"];
 const hubThemes: ClubHubTheme[] = ["community", "industrial", "coastal", "market_town", "academy"];
@@ -155,7 +148,7 @@ function createTactic(clubId: string, rng: RandomSource, isPlayerClub: boolean):
     id: `tactic_${clubId}_default`,
     name: isPlayerClub ? "Balanced XI" : `${pickOne(formations, rng)} Shape`,
     formation: isPlayerClub ? "4-4-2" : pickOne(formations, rng),
-    focus: isPlayerClub ? "balanced" : pickOne(focuses, rng),
+    focus: isPlayerClub ? "balanced" : pickOne(tacticalFocuses, rng),
     riskLevel: isPlayerClub ? "balanced" : pickOne(riskLevels, rng),
     instructions: []
   };

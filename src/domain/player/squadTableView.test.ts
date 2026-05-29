@@ -9,8 +9,8 @@ describe("squad table view", () => {
     const older = generatePlayer({ clubId: "club", position: "GK", statRange: lowestLeagueStatRange, kitNumber: 1 });
     younger.age = 18;
     older.age = 33;
-    younger.currentStats = { PAS: 1, SHO: 10, TAC: 1, CRO: 1, HEA: 8, ACC: 10, TEC: 9, PHY: 1, MEN: 8 };
-    younger.potentialStats = { PAS: 2, SHO: 2, TAC: 2, CRO: 2, HEA: 2, ACC: 2, TEC: 2, PHY: 2, MEN: 2 };
+    younger.currentStats = { PAS: 1, SHO: 10, TAC: 1, CRO: 1, HEA: 8, ACC: 10, STA: 7, DRI: 9, POS: 8, TEC: 9, PHY: 1, MEN: 8 };
+    younger.potentialStats = { PAS: 2, SHO: 2, TAC: 2, CRO: 2, HEA: 2, ACC: 2, STA: 2, DRI: 2, POS: 2, TEC: 2, PHY: 2, MEN: 2 };
     older.currentStats = { REF: 2, HAN: 2, DIS: 2, TEC: 2, PHY: 2, MEN: 2 };
     older.potentialStats = { REF: 10, HAN: 10, DIS: 10, TEC: 10, PHY: 10, MEN: 10 };
 
@@ -23,7 +23,7 @@ describe("squad table view", () => {
   it("shows missing role stats as dashes and sorts numeric stat values before dashes", () => {
     const outfield = generatePlayer({ clubId: "club", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9 });
     const goalkeeper = generatePlayer({ clubId: "club", position: "GK", statRange: lowestLeagueStatRange, kitNumber: 1 });
-    outfield.currentStats = { PAS: 4, SHO: 8, TAC: 2, CRO: 3, HEA: 5, ACC: 9, TEC: 6, PHY: 7, MEN: 5 };
+    outfield.currentStats = { PAS: 4, SHO: 8, TAC: 2, CRO: 3, HEA: 5, ACC: 9, STA: 6, DRI: 7, POS: 5, TEC: 6, PHY: 7, MEN: 5 };
     goalkeeper.currentStats = { REF: 9, HAN: 7, DIS: 6, TEC: 4, PHY: 5, MEN: 6 };
 
     expect(getSquadStatValue(outfield, "REF")).toBe("-");
@@ -35,6 +35,9 @@ describe("squad table view", () => {
     expect(getSquadStatValue(goalkeeper, "CRO")).toBe("-");
     expect(getSquadStatValue(goalkeeper, "HEA")).toBe("-");
     expect(getSquadStatValue(goalkeeper, "ACC")).toBe("-");
+    expect(getSquadStatValue(goalkeeper, "STA")).toBe("-");
+    expect(getSquadStatValue(goalkeeper, "DRI")).toBe("-");
+    expect(getSquadStatValue(goalkeeper, "POS")).toBe("-");
     expect(sortSquadPlayers([goalkeeper, outfield], { column: "SHO", direction: "asc" })[0].id).toBe(outfield.id);
     expect(sortSquadPlayers([outfield, goalkeeper], { column: "SHO", direction: "desc" })[0].id).toBe(outfield.id);
   });

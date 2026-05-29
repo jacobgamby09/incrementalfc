@@ -9,6 +9,7 @@ import {
   type Player,
   type PlayerPosition
 } from "../types/player";
+import { getOutfieldStatValue } from "./statAccess";
 
 export type PlayerRatingHistoryEntry = {
   matchId: string;
@@ -60,11 +61,16 @@ function weightedAverage(values: Array<[number, number]>): number {
 }
 
 function outfieldRating(stats: OutfieldStats, position: PlayerPosition): number {
-  if (position === "ST") return weightedAverage([[stats.SHO, 3], [stats.ACC, 1.5], [stats.TEC, 1.5], [stats.MEN, 1], [stats.HEA, 1]]);
-  if (["LW", "RW", "AM"].includes(position)) return weightedAverage([[stats.TEC, 2], [stats.ACC, 1.5], [stats.SHO, 1.5], [stats.PAS, 1], [stats.CRO, 1], [stats.MEN, 1]]);
-  if (["CM", "DM"].includes(position)) return weightedAverage([[stats.PAS, 2], [stats.TEC, 2], [stats.MEN, 1.5], [stats.PHY, 1], [stats.TAC, position === "DM" ? 1.5 : 1]]);
-  if (["CB", "LB", "RB", "WB"].includes(position)) return weightedAverage([[stats.TAC, 2.5], [stats.PHY, 1.5], [stats.HEA, 1.5], [stats.MEN, 1.5], [stats.ACC, ["LB", "RB", "WB"].includes(position) ? 1 : 0.4]]);
-  return weightedAverage([[stats.PAS, 1], [stats.TEC, 1], [stats.MEN, 1]]);
+  const value = (key: keyof OutfieldStats) => getOutfieldStatValue(stats, key);
+  if (position === "ST") return weightedAverage([[value("SHO"), 3], [value("POS"), 2], [value("ACC"), 1.5], [value("TEC"), 1.25], [value("DRI"), 1.25], [value("MEN"), 0.75]]);
+  if (["LW", "RW"].includes(position)) return weightedAverage([[value("DRI"), 2.5], [value("ACC"), 2], [value("CRO"), 1.75], [value("TEC"), 1.5], [value("SHO"), 1], [value("POS"), 0.75]]);
+  if (position === "AM") return weightedAverage([[value("PAS"), 2], [value("TEC"), 2], [value("POS"), 1.5], [value("MEN"), 1.25], [value("DRI"), 1.25], [value("SHO"), 1]]);
+  if (position === "CM") return weightedAverage([[value("PAS"), 2.2], [value("TEC"), 1.8], [value("POS"), 1.6], [value("MEN"), 1.4], [value("DRI"), 0.8], [value("STA"), 0.8]]);
+  if (position === "DM") return weightedAverage([[value("TAC"), 2.2], [value("POS"), 2], [value("PHY"), 1.3], [value("PAS"), 1.2], [value("MEN"), 1.2], [value("STA"), 0.9]]);
+  if (position === "WB") return weightedAverage([[value("STA"), 2], [value("ACC"), 1.8], [value("CRO"), 1.7], [value("DRI"), 1.4], [value("TAC"), 1.2], [value("POS"), 1]]);
+  if (["LB", "RB"].includes(position)) return weightedAverage([[value("TAC"), 2], [value("POS"), 1.6], [value("ACC"), 1.4], [value("STA"), 1.1], [value("CRO"), 1], [value("PHY"), 1]]);
+  if (position === "CB") return weightedAverage([[value("TAC"), 2.5], [value("POS"), 2.2], [value("PHY"), 1.6], [value("HEA"), 1.6], [value("MEN"), 1.1]]);
+  return weightedAverage([[value("PAS"), 1], [value("TEC"), 1], [value("MEN"), 1]]);
 }
 
 function goalkeeperRating(stats: GoalkeeperStats): number {

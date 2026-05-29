@@ -46,6 +46,24 @@ export const statDefinitions: Record<StatKey, StatDefinition> = {
     description: "Burst, pace over short distances, and ability to attack space.",
     matchEngineUsage: "Affects fast breakaways, wide threats, recovery, and transition danger."
   },
+  STA: {
+    code: "STA",
+    name: "Stamina",
+    description: "Engine, repeat-effort capacity, and ability to maintain intensity late in matches.",
+    matchEngineUsage: "Affects fatigue, pressing, wing backs, aggressive risk, repeated actions, and late-match effectiveness."
+  },
+  DRI: {
+    code: "DRI",
+    name: "Dribbling",
+    description: "Ball-carrying quality, 1v1 ability, and control while moving at speed.",
+    matchEngineUsage: "Affects wide play, fast breaks, breaking compact blocks, and transition chance quality."
+  },
+  POS: {
+    code: "POS",
+    name: "Positioning",
+    description: "Off-ball intelligence, timing, marking, and ability to find or close space.",
+    matchEngineUsage: "Affects defensive positioning, attacking movement, box runs, rebounds, and closing angles."
+  },
   TEC: {
     code: "TEC",
     name: "Technique",

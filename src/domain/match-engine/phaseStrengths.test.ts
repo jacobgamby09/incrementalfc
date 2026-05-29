@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateGameState } from "../generation/generateGameState";
 import { autoSelectLineup } from "../lineup/selectLineup";
+import type { Tactic } from "../types/tactics";
 import { calculatePhaseStrengths } from "./calculatePhaseStrengths";
 
 describe("phase strengths", () => {
@@ -24,5 +25,32 @@ describe("phase strengths", () => {
     const poorFitStrengths = calculatePhaseStrengths(club, gameState, poorFitLineup, tactic);
 
     expect(poorFitStrengths.attack).toBeLessThan(naturalStrengths.attack);
+  });
+
+  it("uses slot-position weighting so formation shape changes phase strengths", () => {
+    const gameState = generateGameState();
+    const club = gameState.clubs[gameState.playerClubId];
+    const defensiveTactic: Tactic = {
+      ...club.tactics.activeTactic,
+      id: "test_541",
+      formation: "5-4-1",
+      focus: "balanced",
+      riskLevel: "balanced"
+    };
+    const attackingTactic: Tactic = {
+      ...club.tactics.activeTactic,
+      id: "test_343",
+      formation: "3-4-3",
+      focus: "balanced",
+      riskLevel: "balanced"
+    };
+    const defensiveLineup = autoSelectLineup(club, gameState, defensiveTactic);
+    const attackingLineup = autoSelectLineup(club, gameState, attackingTactic);
+
+    const defensiveShape = calculatePhaseStrengths(club, gameState, defensiveLineup, defensiveTactic);
+    const attackingShape = calculatePhaseStrengths(club, gameState, attackingLineup, attackingTactic);
+
+    expect(defensiveShape.defence).toBeGreaterThan(attackingShape.defence);
+    expect(attackingShape.attack).toBeGreaterThan(defensiveShape.attack);
   });
 });

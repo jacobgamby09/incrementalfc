@@ -1,9 +1,10 @@
 import { calculatePlayerOvr, calculatePlayerPot, getPlayerPerformanceSummary } from "./playerSummaries";
 import { getPlayerCapStatus } from "../development/playerDevelopment";
 import type { GameState } from "../types/game";
-import type { Player, PlayerPosition } from "../types/player";
+import type { OutfieldStatKey, Player, PlayerPosition } from "../types/player";
 import { isGoalkeeperStats } from "../types/player";
 import { getStatDefinition } from "./statDefinitions";
+import { getOutfieldStatValue } from "./statAccess";
 
 export type SortDirection = "asc" | "desc";
 export type SquadAgeFilter = "all" | "youth" | "developing" | "prime" | "veteran";
@@ -47,7 +48,7 @@ export function getSquadStatValue(player: Player, column: string): number | Miss
   }
 
   if (column === "REF" || column === "HAN" || column === "DIS") return "-";
-  return Number(stats[column as keyof typeof stats]);
+  return getOutfieldStatValue(stats, column as OutfieldStatKey);
 }
 
 export function squadSortValue(player: Player, column: string, gameState?: GameState): SquadTableCellSortValue {

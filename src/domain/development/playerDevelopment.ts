@@ -12,6 +12,7 @@ import {
   type PlayerPosition,
   type PlayerStatGrowth
 } from "../types/player";
+import { getOutfieldStatValue } from "../player/statAccess";
 
 export type DevelopmentSummary = {
   developmentCap: number;
@@ -59,16 +60,16 @@ const ageCurveModifiers: Record<Player["development"]["ageCurveStage"], number> 
 
 const statPriorityByPosition: Record<PlayerPosition, string[]> = {
   GK: ["REF", "HAN", "DIS", "MEN"],
-  CB: ["TAC", "PHY", "HEA", "MEN"],
-  LB: ["TAC", "ACC", "PHY", "CRO", "MEN"],
-  RB: ["TAC", "ACC", "PHY", "CRO", "MEN"],
-  WB: ["TAC", "ACC", "PHY", "CRO", "MEN"],
-  DM: ["TAC", "PHY", "PAS", "MEN"],
-  CM: ["PAS", "TEC", "MEN", "PHY"],
-  AM: ["PAS", "TEC", "SHO", "MEN"],
-  LW: ["ACC", "CRO", "TEC", "SHO", "MEN"],
-  RW: ["ACC", "CRO", "TEC", "SHO", "MEN"],
-  ST: ["SHO", "ACC", "TEC", "HEA", "MEN"]
+  CB: ["TAC", "POS", "PHY", "HEA", "MEN"],
+  LB: ["TAC", "POS", "ACC", "STA", "CRO", "MEN"],
+  RB: ["TAC", "POS", "ACC", "STA", "CRO", "MEN"],
+  WB: ["STA", "ACC", "CRO", "DRI", "TAC", "POS"],
+  DM: ["TAC", "POS", "STA", "PAS", "MEN"],
+  CM: ["PAS", "TEC", "POS", "MEN", "STA"],
+  AM: ["PAS", "TEC", "DRI", "POS", "SHO", "MEN"],
+  LW: ["DRI", "ACC", "CRO", "TEC", "POS", "SHO"],
+  RW: ["DRI", "ACC", "CRO", "TEC", "POS", "SHO"],
+  ST: ["SHO", "POS", "ACC", "TEC", "DRI", "MEN"]
 };
 
 export function getAgeCurveModifier(player: Player): number {
@@ -166,10 +167,16 @@ export function createMatchXpRewards(match: Match, gameState: GameState, club: C
 }
 
 function statValue(player: Player, key: string): number {
+  if (!isGoalkeeperStats(player.currentStats)) {
+    return getOutfieldStatValue(player.currentStats, key as OutfieldStatKey);
+  }
   return Number(player.currentStats[key as keyof typeof player.currentStats]);
 }
 
 function potentialValue(player: Player, key: string): number {
+  if (!isGoalkeeperStats(player.potentialStats)) {
+    return getOutfieldStatValue(player.potentialStats, key as OutfieldStatKey);
+  }
   return Number(player.potentialStats[key as keyof typeof player.potentialStats]);
 }
 

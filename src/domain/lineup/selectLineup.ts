@@ -4,6 +4,7 @@ import type { GameState } from "../types/game";
 import { isGoalkeeperStats, type OutfieldStats, type Player, type PlayerPosition } from "../types/player";
 import type { Lineup, LineupSlot, Tactic } from "../types/tactics";
 import { calculatePositionFit, getPositionFitModifier, type PositionFitLevel } from "./positionFit";
+import { getOutfieldStatValue } from "../player/statAccess";
 
 export type LineupValidationResult = {
   valid: boolean;
@@ -23,13 +24,14 @@ function average(values: number[]): number {
 }
 
 function outfieldScore(stats: OutfieldStats, slotPosition: PlayerPosition): number {
+  const value = (key: keyof OutfieldStats) => getOutfieldStatValue(stats, key);
   if (["CB", "LB", "RB", "WB"].includes(slotPosition)) {
-    return average([stats.TAC, stats.PHY, stats.HEA, stats.MEN]);
+    return average([value("TAC"), value("POS"), value("PHY"), value("HEA"), value("STA")]);
   }
   if (["DM", "CM", "AM"].includes(slotPosition)) {
-    return average([stats.PAS, stats.TEC, stats.MEN, stats.TAC]);
+    return average([value("PAS"), value("TEC"), value("POS"), value("MEN"), value("STA")]);
   }
-  return average([stats.SHO, stats.ACC, stats.TEC, stats.CRO]);
+  return average([value("SHO"), value("ACC"), value("DRI"), value("POS"), value("TEC"), value("CRO")]);
 }
 
 export function scorePlayerForPosition(player: Player, slotPosition: PlayerPosition): number {
