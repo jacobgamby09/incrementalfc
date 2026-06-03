@@ -10,7 +10,7 @@ import {
   type PlayerPosition
 } from "../types/player";
 import { getOutfieldStatValue } from "./statAccess";
-import { getRealPotentialStats } from "./playerPotential";
+import { getEffectivePotentialStats, getRealPotentialStats } from "./playerPotential";
 
 export type PlayerRatingHistoryEntry = {
   matchId: string;
@@ -99,7 +99,13 @@ export function calculatePlayerRealPot(player: Player): number {
   return roundTo(value, 1);
 }
 
-export const calculatePlayerPot = calculatePlayerRealPot;
+export function calculatePlayerPot(player: Player): number {
+  const stats = getEffectivePotentialStats(player);
+  const value = isGoalkeeperStats(stats)
+    ? goalkeeperRating(stats)
+    : outfieldRating(stats, player.primaryPosition);
+  return roundTo(value, 1);
+}
 
 function fixtureForMatch(gameState: GameState, seasonId: string, match: Match): Fixture | undefined {
   return gameState.seasons[seasonId]?.fixtures.find((fixture) => fixture.id === match.fixtureId);

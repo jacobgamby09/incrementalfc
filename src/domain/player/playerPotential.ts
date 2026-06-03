@@ -16,3 +16,11 @@ export function getEffectivePotentialValue(player: Player, key: string): number 
 export function getRealPotentialStats(player: Player): Player["potentialStats"] {
   return player.potentialStats;
 }
+
+export function getEffectivePotentialStats(player: Player): Player["potentialStats"] {
+  const effectiveStats = { ...player.potentialStats } as Record<string, number>;
+  for (const key of Object.keys(effectiveStats)) {
+    effectiveStats[key] = getEffectivePotentialValue(player, key);
+  }
+  return effectiveStats as Player["potentialStats"];
+}

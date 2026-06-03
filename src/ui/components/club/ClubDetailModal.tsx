@@ -3,7 +3,7 @@ import type { GameState } from "../../../domain/types/game";
 import type { Club } from "../../../domain/types/club";
 import type { Player } from "../../../domain/types/player";
 import { getFacilityProfile } from "../../../data/constants/facilityProfiles";
-import { calculatePlayerOvr, calculatePlayerRealPot, getPlayerPerformanceSummary } from "../../../domain/player/playerSummaries";
+import { calculatePlayerOvr, calculatePlayerPot, getPlayerPerformanceSummary } from "../../../domain/player/playerSummaries";
 import { getScoutedPotentialReport, formatScoutedPotential } from "../../../domain/scouting/scoutedPotential";
 import { useState } from "react";
 import { PlayerDetailSheet } from "../player/PlayerDetailSheet";
@@ -206,7 +206,7 @@ export function ClubDetailModal({ clubId, gameState, onClose }: ClubDetailModalP
                     const isPlayerInOwnClub = player.clubId === playerClub.id;
                     const potentialReport = getScoutedPotentialReport(player, playerClub);
                     const potString = isPlayerInOwnClub
-                      ? `${Math.round(calculatePlayerRealPot(player))}`
+                      ? `${Math.round(calculatePlayerPot(player))}`
                       : formatScoutedPotential(potentialReport);
 
                     const stats = getPlayerPerformanceSummary(gameState, player.id);

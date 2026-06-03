@@ -1,7 +1,7 @@
 import type { Club } from "../types/club";
 import type { Player } from "../types/player";
 import { getFacilityLevelConfig } from "../../data/constants/facilityProfiles";
-import { calculatePlayerRealPot } from "../player/playerSummaries";
+import { calculatePlayerPot } from "../player/playerSummaries";
 
 export type ScoutingConfidence = "Low" | "Medium" | "High";
 
@@ -33,7 +33,7 @@ export function getScoutingAccuracy(club: Club): number {
 
 export function getScoutedPotentialReport(player: Player, scoutingClub: Club): ScoutedPotentialReport {
   const accuracy = getScoutingAccuracy(scoutingClub);
-  const realPot = calculatePlayerRealPot(player);
+  const realPot = calculatePlayerPot(player);
   const uncertainty = Math.max(1, Math.round((1 - accuracy) * 10));
 
   return {

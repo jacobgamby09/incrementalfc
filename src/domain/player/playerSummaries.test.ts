@@ -8,6 +8,7 @@ import type { Match, MatchTeamStats, PlayerMatchStats } from "../types/match";
 import {
   calculatePlayerOvr,
   calculatePlayerPot,
+  calculatePlayerRealPot,
   getMatchRatingRows,
   getPlayerPerformanceSummary,
   getPlayerRatingHistory,
@@ -160,12 +161,13 @@ describe("player summaries", () => {
     expect(calculatePlayerPot(player)).toBe(10);
   });
 
-  it("preserves real POT for players aged 30 or older even when normal development has stopped", () => {
+  it("shows effective POT at current level for players aged 30 or older", () => {
     const player = generatePlayer({ clubId: "c", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9, age: 30 });
     player.currentStats = { PAS: 4, SHO: 6, TAC: 4, CRO: 4, HEA: 4, ACC: 6, STA: 5, DRI: 5, POS: 6, TEC: 6, PHY: 5, MEN: 5 };
     player.potentialStats = { PAS: 10, SHO: 12, TAC: 10, CRO: 10, HEA: 10, ACC: 12, STA: 10, DRI: 10, POS: 12, TEC: 12, PHY: 10, MEN: 10 };
 
-    expect(calculatePlayerPot(player)).toBeGreaterThan(calculatePlayerOvr(player));
+    expect(calculatePlayerRealPot(player)).toBeGreaterThan(calculatePlayerOvr(player));
+    expect(calculatePlayerPot(player)).toBe(calculatePlayerOvr(player));
   });
 
   it("changes OVR when new role-relevant stats change", () => {

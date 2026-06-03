@@ -10,14 +10,14 @@ describe("squad table view", () => {
     younger.age = 18;
     older.age = 33;
     younger.currentStats = { PAS: 1, SHO: 10, TAC: 1, CRO: 1, HEA: 8, ACC: 10, STA: 7, DRI: 9, POS: 8, TEC: 9, PHY: 1, MEN: 8 };
-    younger.potentialStats = { PAS: 2, SHO: 2, TAC: 2, CRO: 2, HEA: 2, ACC: 2, STA: 2, DRI: 2, POS: 2, TEC: 2, PHY: 2, MEN: 2 };
+    younger.potentialStats = { PAS: 10, SHO: 10, TAC: 10, CRO: 10, HEA: 10, ACC: 10, STA: 10, DRI: 10, POS: 10, TEC: 10, PHY: 10, MEN: 10 };
     older.currentStats = { REF: 2, HAN: 2, DIS: 2, TEC: 2, PHY: 2, MEN: 2 };
     older.potentialStats = { REF: 10, HAN: 10, DIS: 10, TEC: 10, PHY: 10, MEN: 10 };
 
     expect(sortSquadPlayers([older, younger], { column: "Age", direction: "asc" })[0].id).toBe(younger.id);
     expect(sortSquadPlayers([younger, older], { column: "Position", direction: "asc" })[0].primaryPosition).toBe("GK");
     expect(sortSquadPlayers([older, younger], { column: "OVR", direction: "desc" })[0].id).toBe(younger.id);
-    expect(sortSquadPlayers([younger, older], { column: "Est. POT", direction: "desc" })[0].id).toBe(older.id);
+    expect(sortSquadPlayers([younger, older], { column: "Est. POT", direction: "desc" })[0].id).toBe(younger.id);
   });
 
   it("shows missing role stats as dashes and sorts numeric stat values before dashes", () => {
