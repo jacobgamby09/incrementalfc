@@ -21,6 +21,10 @@ import { formatCurrency } from "../../../utils/format";
 import { PlayerNameButton } from "./PlayerNameButton";
 import { StatLabel } from "./StatLabel";
 import { squadTablePresets, type SquadTablePresetId } from "./squadTablePresets";
+import { getPlayerFitness, getReadinessLabel, getReadinessColor } from "../../../domain/fitness/playerFitness";
+import { squadRoleLabels } from "../../../domain/player/playerContext";
+import { MoraleIndicator } from "./MoraleIndicator";
+import { getBestPlayerTacticalFit } from "../../../domain/player/tacticalFit";
 
 type SquadPreviewProps = {
   players: Player[];
@@ -53,8 +57,37 @@ function cellValue(player: Player, column: string, gameState?: GameState): strin
 
   if (column === "Age") return player.age;
   if (column === "Position") return player.primaryPosition;
-  if (column === "OVR") return calculatePlayerOvr(player).toFixed(1);
-  if (column === "Est. POT") return calculatePlayerPot(player).toFixed(1);
+  if (column === "OVR") return Math.round(calculatePlayerOvr(player));
+  if (column === "POT" || column === "Est. POT") return Math.round(calculatePlayerPot(player));
+  if (column === "Dev Points") {
+    const points = player.development.unspentDevelopmentPoints ?? 0;
+    return points > 0 ? (
+      <span className="rounded bg-emerald-100 px-2 py-1 text-xs font-bold text-emerald-800">
+        {points} ready
+      </span>
+    ) : "-";
+  }
+  if (column === "Squad Role") return squadRoleLabels[player.squadRole];
+  if (column === "Best Focus") {
+    const fit = getBestPlayerTacticalFit(player);
+    return (
+      <span className="inline-flex items-center gap-1 rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-xs font-semibold text-sky-900" title={`Best tactical focus fit based on current attributes: ${fit.primaryStats.join(", ")}`}>
+        {fit.label} <span className="tabular-nums">{fit.score}%</span>
+      </span>
+    );
+  }
+  if (column === "Morale") return <MoraleIndicator morale={player.status.morale} compact />;
+  if (column === "Market Rep") return player.marketReputation;
+  if (column === "Readiness") {
+    const fitness = getPlayerFitness(player);
+    const label = getReadinessLabel(fitness);
+    const colors = getReadinessColor(fitness);
+    return (
+      <span className={`inline-flex items-center rounded border px-1.5 py-0.5 text-xs font-semibold ${colors.bg} ${colors.text} ${colors.border}`}>
+        {label} ({fitness})
+      </span>
+    );
+  }
   if (column === "Form") return formPills(performance?.formLastFive ?? []);
   if (column === "Avg Rating") return performance?.display.avgRating ?? "-";
   if (column === "Last Rating") return performance?.display.lastRating ?? "-";
@@ -63,7 +96,10 @@ function cellValue(player: Player, column: string, gameState?: GameState): strin
   if (column === "Assists/Key Passes") return `${performance?.assists ?? 0}/${performance?.keyPasses ?? 0}`;
   if (column === "Wage") return formatCurrency(player.contract.wagePerWeek);
   if (column === "Value") return formatCurrency(player.contract.marketValue);
-  if (column === "Contract Remaining") return `${player.contract.weeksRemaining} wks`;
+  if (column === "Contract Remaining") {
+    const seasons = player.contract.seasonsRemaining;
+    return `${seasons} season${seasons === 1 ? "" : "s"}`;
+  }
   if (column === "Development Cap") {
     const club = gameState && player.clubId ? gameState.clubs[player.clubId] : undefined;
     return club ? getPlayerDevelopmentSummary(player, club).developmentCap : "-";
@@ -82,7 +118,7 @@ function cellValue(player: Player, column: string, gameState?: GameState): strin
     return summary?.cappedByPotential ? "Capped" : "Open";
   }
   if (column === "Recent Growth") return summarizeGrowth(player);
-  if (column === "Cap Status") {
+  if (column === "Development Status") {
     const club = gameState && player.clubId ? gameState.clubs[player.clubId] : undefined;
     return club ? getPlayerCapStatus(player, club) : "Developing";
   }
@@ -103,9 +139,9 @@ export function SquadPreview({
 }: SquadPreviewProps): JSX.Element {
   const selectedPreset = squadTablePresets.find((candidate) => candidate.id === preset) ?? squadTablePresets[0];
   const [sort, setSort] = useState<SquadSort>({ column: "Position", direction: "asc" });
-  const [filters, setFilters] = useState<SquadFilters>({ position: "all", capStatus: "all", ageGroup: "all" });
+  const [filters, setFilters] = useState<SquadFilters>({ position: "all", developmentStatus: "all", ageGroup: "all" });
   const positions = Array.from(new Set(players.map((player) => player.primaryPosition))).sort();
-  const capStatuses = Array.from(new Set(players.map((player) => {
+  const developmentStatuses = Array.from(new Set(players.map((player) => {
     const club = gameState && player.clubId ? gameState.clubs[player.clubId] : undefined;
     return club ? getPlayerCapStatus(player, club) : "Developing";
   }))).sort();
@@ -156,14 +192,14 @@ export function SquadPreview({
               </select>
             </label>
             <label className="font-medium text-stone-700">
-              Cap Status
+              Development Status
               <select
-                value={filters.capStatus}
-                onChange={(event) => setFilters((current) => ({ ...current, capStatus: event.target.value as SquadFilters["capStatus"] }))}
+                value={filters.developmentStatus}
+                onChange={(event) => setFilters((current) => ({ ...current, developmentStatus: event.target.value as SquadFilters["developmentStatus"] }))}
                 className="mt-1 h-9 w-full rounded border border-stone-300 bg-white px-2 text-sm"
               >
-                <option value="all">All cap statuses</option>
-                {capStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                <option value="all">All development statuses</option>
+                {developmentStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
               </select>
             </label>
             <label className="font-medium text-stone-700">
@@ -191,15 +227,7 @@ export function SquadPreview({
                 <th key={column} className="px-3 py-2 font-semibold first:pl-0 last:pr-0">
                   {getStatDefinition(column) ? (
                     <span className="inline-flex items-center gap-1" title={statTooltip(column)}>
-                      <StatLabel code={column} />
-                      <button
-                        type="button"
-                        onClick={() => toggleSort(column)}
-                        className="font-semibold underline-offset-2 hover:underline"
-                        aria-label={`Sort by ${column}`}
-                      >
-                        {sortMark(column)}
-                      </button>
+                      <StatLabel code={column} onClick={() => toggleSort(column)} suffix={sortMark(column)} />
                     </span>
                   ) : (
                     <button

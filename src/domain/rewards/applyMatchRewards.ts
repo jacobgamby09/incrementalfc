@@ -15,10 +15,6 @@ export function applyMatchRewards(gameState: GameState, clubId: string, match: M
         ...club,
         reputation: Number((club.reputation + match.rewards.reputation).toFixed(2)),
         fans: club.fans + match.rewards.fans,
-        economy: {
-          ...club.economy,
-          cashBalance: club.economy.cashBalance + match.rewards.money
-        },
         tactics: {
           ...club.tactics,
           familiarityByTacticId: Object.entries(match.rewards.tacticalFamiliarity).reduce(

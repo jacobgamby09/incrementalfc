@@ -1,5 +1,6 @@
 import { clamp } from "../../utils/math";
 import { getOutfieldStatValue } from "../player/statAccess";
+import { getPlayerFitness } from "../fitness/playerFitness";
 import { isGoalkeeperStats, type OutfieldStatKey, type OutfieldStats, type Player, type PlayerPosition } from "../types/player";
 import type { Lineup, Tactic } from "../types/tactics";
 import type { GameState } from "../types/game";
@@ -16,6 +17,14 @@ export const duelRecipes = {
   sustainedPressureDefence: { TAC: 1.15, POS: 1.25, STA: 0.9, MEN: 0.9 },
   reboundAttack: { POS: 1.4, SHO: 1.15, ACC: 0.75, MEN: 0.8 },
   reboundDefence: { POS: 1.25, TAC: 1.1, PHY: 0.95, HEA: 0.9 },
+  cornerAttack: { HEA: 1.45, PHY: 1.05, POS: 1.1, MEN: 0.7 },
+  cornerDefence: { HEA: 1.4, PHY: 1.05, POS: 1.05, MEN: 0.7 },
+  indirectFreeKickAttack: { HEA: 1.25, POS: 1.2, PHY: 0.95, MEN: 0.75 },
+  indirectFreeKickDefence: { HEA: 1.25, POS: 1.2, PHY: 0.95, MEN: 0.75 },
+  directFreeKickAttack: { SHO: 1.45, TEC: 1.2, MEN: 0.85 },
+  directFreeKickDefence: { POS: 1.1, MEN: 1, PHY: 0.6 },
+  penaltyAttack: { SHO: 1.45, MEN: 1.25, TEC: 0.65 },
+  penaltyDefence: { MEN: 1.2, POS: 0.5 },
   pressResistance: { PAS: 1.2, TEC: 1.1, POS: 1, MEN: 0.9 },
   pressing: { STA: 1.25, ACC: 1, TAC: 1, MEN: 0.8 }
 } satisfies Record<string, DuelRecipe>;
@@ -46,9 +55,11 @@ export function getFatigueModifier(options: {
     (options.repeatedActions ?? 0) * 0.015;
   const staminaShortfall = clamp((10 - stamina) / 10, 0, 1);
   const staminaShield = clamp((stamina - 7) / 12, 0, 0.08);
-  const fatigueLoss = lateFactor * clamp(0.025 + staminaShortfall * 0.12 + tacticalCost * 0.12 - staminaShield, 0, 0.18);
+  const fitness = getPlayerFitness(options.player);
+  const startingFitnessPenalty = clamp((100 - fitness) / 100 * 0.10, 0, 0.10);
+  const fatigueLoss = lateFactor * clamp(0.025 + staminaShortfall * 0.12 + tacticalCost * 0.12 - staminaShield + startingFitnessPenalty, 0, 0.22);
 
-  return clamp(1 - fatigueLoss, 0.82, 1);
+  return clamp(1 - fatigueLoss, 0.78, 1);
 }
 
 export function scoreDuelRecipe(options: {
@@ -100,6 +111,18 @@ export function recipesForChanceType(chanceType: ChanceType): { attack: DuelReci
   }
   if (chanceType === "rebound_big_chance") {
     return { attack: duelRecipes.reboundAttack, defence: duelRecipes.reboundDefence };
+  }
+  if (chanceType === "corner") {
+    return { attack: duelRecipes.cornerAttack, defence: duelRecipes.cornerDefence };
+  }
+  if (chanceType === "indirect_free_kick") {
+    return { attack: duelRecipes.indirectFreeKickAttack, defence: duelRecipes.indirectFreeKickDefence };
+  }
+  if (chanceType === "direct_free_kick") {
+    return { attack: duelRecipes.directFreeKickAttack, defence: duelRecipes.directFreeKickDefence };
+  }
+  if (chanceType === "penalty") {
+    return { attack: duelRecipes.penaltyAttack, defence: duelRecipes.penaltyDefence };
   }
   return { attack: duelRecipes.sustainedPressureAttack, defence: duelRecipes.sustainedPressureDefence };
 }

@@ -16,7 +16,11 @@ function strongestChanceProfile(club: Club): Partial<Record<ChanceType, number>>
     fast_breakaway: 20,
     wide_cross: 25,
     sustained_pressure: 25,
-    rebound_big_chance: 8
+    rebound_big_chance: 8,
+    corner: 8,
+    indirect_free_kick: 5,
+    direct_free_kick: 3,
+    penalty: 1
   };
 
   if (club.tactics.activeTactic.focus === "fast_breaks") profile.fast_breakaway += 20;

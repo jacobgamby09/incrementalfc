@@ -25,6 +25,12 @@ export type League = {
   rewardProfile: LeagueRewardProfile;
   facilityCapLimit: number;
   reputationRequirement?: number;
+  targetOvrRange: [number, number];
+  targetPotentialRange: [number, number];
+  rarePotentialMax: number;
+  facilityCap: number;
+  typicalWageRange: [number, number];
+  typicalValueRange: [number, number];
 };
 
 export type LeagueTableEntry = {
@@ -47,7 +53,7 @@ export type Season = {
   fixtures: Fixture[];
   table: LeagueTableEntry[];
   currentMatchday: number;
-  status: "preseason" | "active" | "completed";
+  status: "preseason" | "pending" | "active" | "completed";
   rewardsPaid: boolean;
 };
 

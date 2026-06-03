@@ -1,4 +1,4 @@
-import type { Club, ClubHubTheme, ClubKitStyle, ClubVisualIdentity } from "../types/club";
+import type { Club, ClubHubTheme, ClubKitStyle, ClubVisualIdentity, ClubArchetype, ClubEcosystemState } from "../types/club";
 import type { EconomyState, Facility, FacilitySet } from "../types/economy";
 import type { League } from "../types/league";
 import type { Player, PlayerPosition } from "../types/player";
@@ -6,6 +6,11 @@ import type { ClubTactics, Formation, RiskLevel, TacticalFocus, Tactic } from ".
 import { createId, pickOne, randomInt, type RandomSource } from "../../utils/random";
 import { generatePlayer } from "./generatePlayer";
 import { formations, tacticalFocuses } from "../../data/constants/formations";
+import { createConfiguredFacility, getTotalFacilityUpkeep } from "../../data/constants/facilityProfiles";
+import { economyProfile } from "../../data/constants/economyProfiles";
+import { assignSquadRoles } from "../player/playerContext";
+import type { PlayerNameRegistry } from "../types/game";
+import { generateUniquelyNamedPlayer } from "./playerNameRegistry";
 
 const squadTemplate: PlayerPosition[] = [
   "GK",
@@ -67,6 +72,7 @@ type GenerateClubOptions = {
   shortName: string;
   league: League;
   isPlayerClub?: boolean;
+  nameRegistry?: PlayerNameRegistry;
   rng?: RandomSource;
 };
 
@@ -80,20 +86,18 @@ function createFacility(level: number, assetBaseKey: string, effects: Facility["
       visualTier: level,
       assetKey: `${assetBaseKey}_tier_${level}`,
       upgradeState: "idle"
-    }
+    },
+    construction: null
   };
 }
 
 function createFacilities(): FacilitySet {
   return {
-    trainingGround: createFacility(1, "training_ground", {
-      developmentCapBonus: 10,
-      trainingXpBonus: 0.05
-    }),
-    youthAcademy: createFacility(1, "youth_academy", { youthPotentialBonus: 0.03 }),
-    scoutingNetwork: createFacility(1, "scouting_network", { scoutingAccuracyBonus: 0.05 }),
-    stadium: createFacility(1, "stadium", { matchdayIncomeBonus: 0.05 }),
-    medicalCenter: createFacility(1, "medical_center", { injuryRiskReduction: 0.02 }),
+    trainingGround: createConfiguredFacility("trainingGround"),
+    youthAcademy: createConfiguredFacility("youthAcademy"),
+    scoutingNetwork: createConfiguredFacility("scoutingNetwork"),
+    stadium: createConfiguredFacility("stadium"),
+    medicalCenter: createConfiguredFacility("medicalCenter"),
     analyticsDepartment: createFacility(1, "analytics_department", { reportDetailBonus: 0.05 })
   };
 }
@@ -167,7 +171,7 @@ function createClubTactics(clubId: string, rng: RandomSource, isPlayerClub: bool
 }
 
 function calculateFacilityUpkeep(facilities: FacilitySet): number {
-  return Object.values(facilities).reduce((sum, facility) => sum + facility.upkeepPerWeek, 0);
+  return getTotalFacilityUpkeep(facilities);
 }
 
 function createEconomy(
@@ -176,7 +180,7 @@ function createEconomy(
   reputation: number,
   isPlayerClub: boolean
 ): EconomyState {
-  const staffWageTotal = isPlayerClub ? 2_000 : 1_500;
+  const staffWageTotal = isPlayerClub ? economyProfile.staffWagePlaceholder : 1_500;
   const facilityUpkeepTotal = calculateFacilityUpkeep(facilities);
   const sponsorIncomePerWeek = 1_000 + reputation * 120;
   const matchdayIncomeEstimate = 2_000 + reputation * 90 + facilities.stadium.level * 750;
@@ -184,7 +188,7 @@ function createEconomy(
   const weeklyExpenses = playerWageTotal + staffWageTotal + facilityUpkeepTotal;
 
   return {
-    cashBalance: isPlayerClub ? 250_000 : 180_000,
+    cashBalance: isPlayerClub ? economyProfile.startingPlayerCash : 180_000,
     weeklyIncome,
     weeklyExpenses,
     playerWageTotal,
@@ -193,7 +197,9 @@ function createEconomy(
     scoutingUpkeep: 300,
     academyUpkeep: 300,
     sponsorIncomePerWeek,
-    matchdayIncomeEstimate
+    matchdayIncomeEstimate,
+    financeWarnings: [],
+    transactions: []
   };
 }
 
@@ -202,15 +208,16 @@ export function generateClub({
   shortName,
   league,
   isPlayerClub = false,
+  nameRegistry,
   rng = Math.random
 }: GenerateClubOptions): GeneratedClub {
   const clubId = createId("club", rng);
   const usedKitNumbers = new Set<number>();
-  const generatedPlayers = squadTemplate.map((position, index) => {
+  const generatedPlayers = assignSquadRoles(squadTemplate.map((position, index) => {
     const kitNumber = kitNumberForPosition(position, usedKitNumbers, index + 19);
-
-    return generatePlayer({ clubId, position, statRange: league.playerStatRange, kitNumber, rng });
-  });
+    const options = { clubId, position, statRange: league.playerStatRange, kitNumber, leagueLevel: league.level, rng };
+    return nameRegistry ? generateUniquelyNamedPlayer(options, nameRegistry) : generatePlayer(options);
+  }));
   const players = Object.fromEntries(generatedPlayers.map((player) => [player.id, player]));
   const playerWageTotal = generatedPlayers.reduce(
     (sum, player) => sum + player.contract.wagePerWeek,
@@ -218,6 +225,16 @@ export function generateClub({
   );
   const facilities = createFacilities();
   const reputation = isPlayerClub ? 12 : randomInt(7, 18, rng);
+  const archetypes: ClubArchetype[] = ["ambitious", "stable", "youth_development", "veteran", "financially_cautious"];
+  const archetype = isPlayerClub ? "stable" : pickOne(archetypes, rng);
+  const ecosystem: ClubEcosystemState = {
+    archetype,
+    financialPressure: 0,
+    squadNeedProfile: {
+      positions: [],
+      minOvr: 0
+    }
+  };
 
   return {
     club: {
@@ -233,16 +250,15 @@ export function generateClub({
       economy: createEconomy(playerWageTotal, facilities, reputation, isPlayerClub),
       facilities,
       tactics: createClubTactics(clubId, rng, isPlayerClub),
+      training: {
+        focusedAssignments: []
+      },
       academy: {
-        level: 1,
-        weeklyUpkeep: 300,
         prospectGenerationProgress: 0,
-        prospectGenerationRate: 0.08,
+        pendingProspect: null,
         youthCoachBonus: 0
       },
       scouting: {
-        level: 1,
-        weeklyUpkeep: 300,
         reportAccuracy: 0.45
       },
       seasonStats: {
@@ -261,7 +277,8 @@ export function generateClub({
         relegations: 0,
         highestLeagueLevel: league.level,
         trophies: []
-      }
+      },
+      ecosystem
     },
     players
   };

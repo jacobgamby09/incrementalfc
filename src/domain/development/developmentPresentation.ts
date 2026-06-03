@@ -26,12 +26,12 @@ export type MatchDevelopmentSummary = {
   capWarningExamples: Array<{
     playerId: string;
     playerName: string;
-    status: "Facility capped" | "Potential capped" | "Untapped potential";
+    status: "Facility limited" | "Potential reached";
   }>;
   capWarnings: Array<{
     playerId: string;
     playerName: string;
-    status: "Facility capped" | "Potential capped" | "Untapped potential";
+    status: "Facility limited" | "Potential reached";
   }>;
   noGrowthMessage?: string;
 };
@@ -51,20 +51,16 @@ function xpReasonText(player: Player, matchReward: Match["rewards"]["playerXp"][
   return reasons.join(", ") || "Development XP";
 }
 
-function capPriority(status: "Facility capped" | "Potential capped" | "Untapped potential"): number {
-  if (status === "Facility capped") return 0;
-  if (status === "Potential capped") return 1;
-  return 2;
+function capPriority(status: "Facility limited" | "Potential reached"): number {
+  if (status === "Facility limited") return 0;
+  return 1;
 }
 
-function capSummaryText(status: "Facility capped" | "Potential capped" | "Untapped potential", count: number): string {
-  if (status === "Untapped potential") {
-    return `${count} ${count === 1 ? "player has" : "players have"} untapped potential above current Training Ground cap.`;
+function capSummaryText(status: "Facility limited" | "Potential reached", count: number): string {
+  if (status === "Facility limited") {
+    return `${count} ${count === 1 ? "player is" : "players are"} limited by the current Training Ground.`;
   }
-  if (status === "Facility capped") {
-    return `${count} ${count === 1 ? "player is" : "players are"} facility capped by the current Training Ground.`;
-  }
-  return `${count} ${count === 1 ? "player is" : "players are"} at personal potential.`;
+  return `${count} ${count === 1 ? "player has" : "players have"} reached personal potential for role-relevant stats.`;
 }
 
 export function getMatchDevelopmentSummary(gameState: GameState, match: Match): MatchDevelopmentSummary {
@@ -90,6 +86,7 @@ export function getMatchDevelopmentSummary(gameState: GameState, match: Match): 
       const playerTrainingXp = trainingXp[playerId] ?? 0;
       const totalXp = matchXp + playerTrainingXp;
       const progressPercent = getPlayerDevelopmentSummary(player, playerClub).nextProgressPercent;
+      const developmentPointsGained = player.development.lastDevelopmentPointsGained ?? 0;
       return {
         playerId,
         playerName: playerName(player),
@@ -98,7 +95,10 @@ export function getMatchDevelopmentSummary(gameState: GameState, match: Match): 
         totalXp,
         progressPercent,
         reasonText: xpReasonText(player, matchReward, playerTrainingXp),
-        statIncreaseBadges: statGrowthByPlayerId[playerId] ?? []
+        statIncreaseBadges: [
+          ...(developmentPointsGained > 0 ? [`+${developmentPointsGained} Development Point${developmentPointsGained === 1 ? "" : "s"}`] : []),
+          ...(statGrowthByPlayerId[playerId] ?? [])
+        ]
       };
     })
     .filter((entry): entry is DevelopmentXpGainer => Boolean(entry));
@@ -114,18 +114,17 @@ export function getMatchDevelopmentSummary(gameState: GameState, match: Match): 
       const player = gameState.players[playerId];
       if (!player) return undefined;
       const status = getPlayerCapStatus(player, playerClub);
-      if (status === "Developing") return undefined;
+      if (status === "Developing" || status === "Declining") return undefined;
       return { playerId, playerName: playerName(player), status };
     })
     .filter((entry): entry is MatchDevelopmentSummary["capWarnings"][number] => Boolean(entry))
     .sort((a, b) => capPriority(a.status) - capPriority(b.status));
-  const capCounts = capWarnings.reduce<Record<"Facility capped" | "Potential capped" | "Untapped potential", number>>((counts, warning) => {
+  const capCounts = capWarnings.reduce<Record<"Facility limited" | "Potential reached", number>>((counts, warning) => {
     counts[warning.status] += 1;
     return counts;
   }, {
-    "Facility capped": 0,
-    "Potential capped": 0,
-    "Untapped potential": 0
+    "Facility limited": 0,
+    "Potential reached": 0
   });
   const capSummaries = (Object.entries(capCounts) as Array<[keyof typeof capCounts, number]>)
     .filter(([, count]) => count > 0)
@@ -137,7 +136,7 @@ export function getMatchDevelopmentSummary(gameState: GameState, match: Match): 
     totalMatchXp,
     totalTrainingXp,
     tacticalFamiliarityGained,
-    bankedProgressLabel: "Progress Banked Toward Next Growth",
+    bankedProgressLabel: "Progress Banked Toward Next Development Point",
     topXpGainers,
     bankedProgressPlayers,
     improvedPlayers,
@@ -145,7 +144,7 @@ export function getMatchDevelopmentSummary(gameState: GameState, match: Match): 
     capWarningExamples,
     capWarnings,
     noGrowthMessage: improvedPlayers.length === 0
-      ? "Progress was banked, but no player reached a stat increase this match."
+      ? "Progress was banked. Assign earned development points from Training, Squad, or the player sheet."
       : undefined
   };
 }

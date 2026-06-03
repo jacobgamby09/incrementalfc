@@ -4,7 +4,7 @@ This document captures future mechanic ideas that should not be lost while near-
 
 The goal is to give the game its own identity: a realistic football management simulation with incremental/idle-inspired progression, visible progress bars, meaningful long-term upgrades, and satisfying "one more match" momentum.
 
-These ideas are not immediate implementation requirements. They should be considered after the current core loop, player development visibility, economy, facilities, and season progression are stable.
+This is a living roadmap. Some ideas have now been implemented as foundations, while deeper interactions remain future work. Status labels distinguish shipped foundations from the remaining design work.
 
 ---
 
@@ -41,7 +41,113 @@ Avoid:
 
 ---
 
-## 2. Training Slots and Focused Development
+## Transfer System V1 Roadmap - Milestones 4.2.0 to 4.2.3
+
+### Design Goals
+
+Transfers should create meaningful offseason decisions without turning the game into a negotiation simulator.
+
+- Transfers only happen between seasons.
+- Each offseason transfer window lasts 3 weeks.
+- The player has a limited number of transfer actions per window.
+- Player value is shaped by football logic: ability, age, potential, contract, and market reputation.
+- Club hype does not change when buying or selling players in V1.
+- Existing contracts are tracked in seasons, not weeks.
+- All tuning values live in configuration files so balance can be adjusted after playtests.
+
+### Milestone 4.2.0 - Transfer Window Foundation
+
+- Replace contract weeks with seasons remaining.
+- Add config-driven transfer-window and contract profiles.
+- Add an offseason transfer-window state machine: closed, open, advance week, finalize.
+- Prepare next-season fixtures during rollover but lock matches until the window closes.
+- Keep purchases, sales, morale behavior, and negotiation outcomes out of this foundation patch.
+
+### Milestone 4.2.1 - Player Context - Implemented
+
+- Show player market reputation on the player sheet near wage and value.
+- Add visible squad role: Key Player, Regular Starter, Rotation, Backup, Prospect.
+- Add five readable morale bands:
+  - Thriving: double upward green arrow
+  - Happy: upward green arrow
+  - Content: neutral yellow arrow
+  - Frustrated: downward red arrow
+  - Disengaged: double downward dark-red arrow
+- Add lightweight morale inputs from playing time, squad role expectations, results, and contract state.
+
+Implemented notes:
+
+- Market reputation is initialized from current ability, potential, and prime-age context, then moves slowly after notable performances.
+- Morale remains a 0-100 internal value but is presented through readable arrow bands.
+- Matchday morale changes are intentionally moderate and config-driven.
+
+### Milestone 4.2.2 - Buying and Renewals - Implemented
+
+- Expand the market into tabs: Listed Players, Free Agents, Scouted Opportunities, My Listings, Negotiations.
+- Add contract renewals for existing players.
+- Add four negotiation packages: Lowball, Cautious, Fair, Statement.
+- Limit negotiation patience so Lowball is a meaningful risk rather than a free first click.
+- Let interest depend on player ambition, squad role, wage, club reputation, league level, and expected playing time.
+
+Implemented notes:
+
+- Every submitted offer spends one offseason action.
+- Offers are deterministic and config-driven so acceptance can be tuned during playtests.
+- Accepted signings move immediately into the squad, deduct any transfer fee, and receive the promised role and season-based contract.
+- `My Listings` is visible but remains read-only until Milestone 4.2.3 adds sale strategies and AI offers.
+
+### Milestone 4.2.2.1 - Economy Overview & Finance Ledger - Implemented
+
+- Add a dedicated Economy Screen in the top navigation.
+- Implement a Finance Ledger tracking all cash flow events (baseline income, gate receipts, result bonuses, wages, facility construction upgrades, transfer purchases/sales, and season rollover placement rewards).
+- Integrate dynamic wage calculation and operating reserve runway weeks.
+- Centralize config-driven scenario forecasts (Conservative, Expected, Optimistic) over remaining scheduled fixtures.
+- Bump save game schema version to 4.
+
+Implemented notes:
+
+- Forecasts are limited to the remaining scheduled fixtures of the active season.
+- Scenario forecast helpers remain available for tuning, but the expanded projection panel is intentionally hidden from the Economy screen after UX review.
+- Cash-flow history shows a double-sided progress bar chart.
+- Older saves are safely rejected and reset to version 4 format.
+
+### Milestone 4.2.3 - Selling and AI Activity - Implemented
+
+- Add player listing and sale strategy: Quick Sale, Market Price, Hold Out.
+- Generate lightweight AI offers across transfer weeks.
+- Let AI clubs recruit against squad needs and division strength bands.
+- Keep the system readable: the player chooses strategy and responds to offers rather than manually negotiating every detail.
+
+Implemented notes:
+
+- `Quick Sale`, `Market Price`, and `Hold Out` are config-driven price/speed tradeoffs.
+- Player listings can attract lightweight AI bids immediately and when transfer weeks advance.
+- Incoming offers expire after their active week and can be accepted or rejected from a dedicated Market tab.
+- AI buyers are filtered by affordability and prioritized by squad need, squad depth, and club archetype.
+- Accepted sales update player ownership, both squads, both cash balances, and both finance ledgers without consuming a signing action.
+- Squad safeguards prevent sales that would leave fewer than 11 contracted players.
+
+---
+
+## Persistent Football World - Implemented in Milestone 4.2.4
+
+- The save contains 50 permanent fictional English clubs across five 10-team divisions.
+- Promotion and relegation move existing clubs through the pyramid.
+- Offscreen divisions use lightweight standings simulation during rollover.
+- Every club retains its identity, squad, facilities, economy, and history.
+- Player generation uses configurable nationality weights and nationality-specific name pools.
+- Lower divisions are predominantly English; higher divisions become increasingly international.
+
+Future extensions:
+
+- Club pages for browsing opponents and rival histories.
+- Richer offscreen club transfer activity.
+- Scouting-region unlocks that interact with nationality pools.
+- Nationality flags and squad-composition summaries.
+
+---
+
+## 2. Training Slots and Focused Development - Implemented in Milestone 4.1
 
 ### Concept
 
@@ -184,7 +290,7 @@ Play match
 
 ---
 
-## 5. Matchday Attendance Forecast
+## 5. Matchday Attendance Forecast [Foundation Implemented]
 
 ### Concept
 
@@ -222,7 +328,7 @@ The player understands why a stadium upgrade matters without needing an artifici
 
 ---
 
-## 6. Hype vs Reputation
+## 6. Hype vs Reputation [Foundation Implemented]
 
 Separate short-term hype from long-term reputation.
 
@@ -267,7 +373,7 @@ This gives the game both short-term momentum and long-term progression.
 
 ---
 
-## 7. Youth Intake Progress
+## 7. Youth Intake Progress [Foundation Implemented]
 
 ### Concept
 
@@ -288,7 +394,7 @@ Youth Intake Progress:
 
 ### Output
 
-When the bar fills, the club receives a youth prospect.
+When the bar fills, the club receives a youth prospect decision. The player can sign or release the prospect; prospects do not join the squad automatically.
 
 Prospects should have:
 
@@ -341,7 +447,7 @@ Scouting should reveal clues, not perfect truth, especially early.
 
 ---
 
-## 9. Facility Upgrade Timers
+## 9. Facility Upgrade Timers [Implemented]
 
 Facility upgrades should not always complete instantly.
 
@@ -354,14 +460,14 @@ Construction: 2 / 5 weeks
 
 This makes upgrades feel physical and creates anticipation.
 
-Recommended facility timer targets:
+Implemented facility timer targets:
 
 - Training Ground
 - Youth Academy
 - Stadium
 - Scouting Network
 - Medical Center
-- Analytics Department
+- Analytics Department remains deferred
 
 Avoid making timers annoying. They should create satisfying progress, not block the game too often.
 
@@ -487,38 +593,98 @@ Important:
 
 ---
 
-## 14. Recommended Priority
+## 14. League Ecosystem and Transfer Foundation [Implemented in Milestone 3.4]
 
-Suggested order after Milestone 3 visibility and core season progression:
+### Concept
 
-1. Training Slots and Focused Development
-2. Dashboard Progress Bars
-3. Matchday Attendance Forecast
-4. Youth Intake Progress
-5. Facility Upgrade Timers
-6. Scouting Network Progress
-7. Club Identity Perks
-8. Breakthrough Moments
-9. Training Momentum
-10. Player Sale Loop
+The league should remain believable over many seasons without turning every AI club into an invisible incremental grinder.
+
+AI clubs are maintained by a bounded ecosystem:
+
+```text
+Division strength bands
++ club archetypes
++ aging/decline
++ promotion/relegation effects
++ squad refresh
++ transfer candidate generation
+```
+
+### Why It Works
+
+This prevents two bad outcomes:
+
+- static leagues where opponents feel like scenery
+- power-creep leagues where every division becomes equally strong by season 10
+
+The player should be able to outbuild and outsmart a division. AI clubs should react and refresh, but they should not scale one-to-one with the player's upgrades.
+
+### Transfer Foundation
+
+Before full transfer gameplay, the ecosystem should be able to identify:
+
+- players likely to leave
+- clubs under financial pressure
+- clubs with squad needs
+- players above their current club's level
+- aging players likely to be released
+- prospects worth scouting
+
+This can later power a curated transfer market.
+
+Recommended transfer path:
+
+```text
+Curated market
+-> buy/listed/free-agent interactions
+-> scouting uncertainty
+-> approach any player
+-> full club/player willingness model
+```
+
+---
+
+## 15. Recommended Priority
+
+Suggested order after the current economy and facilities foundation:
+
+1. [Completed] League Ecosystem and Transfer Foundation
+2. [Foundation completed] Dashboard Progress Bars
+3. [Foundation completed] Matchday Attendance Forecast
+4. [Foundation completed] Youth Intake Progress
+5. [Completed] Facility Upgrade Timers
+6. Training Slots and Focused Development
+7. Scouting Assignment Progress
+8. Club Identity Perks
+9. Breakthrough Moments
+10. Training Momentum
+11. Player Sale Loop
 
 This order adds incremental identity without derailing the immediate prototype.
 
 ---
 
-## 15. Near-Term Backlog Candidates
+## 16. Near-Term Backlog Candidates
 
 These should become Linear issues or implementation prompts later:
 
+- [Implemented] Design/Implement League Ecosystem and Strength Bands
+- [Implemented] Design/Implement AI Club Archetypes
+- [Implemented] Design/Implement Season Rollover Foundation
+- [Implemented] Design/Implement Transfer Candidate Generation
 - Design/Implement Training Slots
 - Design/Implement Development Focus Paths
-- Design/Implement Dashboard Progress Bars
-- Design/Implement Matchday Attendance Forecast
-- Design/Implement Youth Intake Progress
+- [Foundation implemented] Design/Implement Dashboard Progress Bars
+- [Foundation implemented] Design/Implement Matchday Attendance Forecast
+- [Foundation implemented] Design/Implement Youth Intake Progress
 - Design/Implement Scouting Assignment Progress
-- Design/Implement Facility Upgrade Timers
-- Design/Implement Hype vs Reputation
+- [Implemented] Design/Implement Facility Upgrade Timers
+- [Foundation implemented] Design/Implement Hype vs Reputation
 - Design/Implement Club Identity Perks
 - Design/Implement Breakthrough Moments
 - Design/Implement Training Momentum
 - Design/Implement Player Sale Loop
+- Design/Implement Substitutions & In-Match Rotation (combining starting fitness with mid-match stamina loss)
+- Design/Implement Injury System (where lower readiness increases the risk of muscle injuries)
+- Design/Implement Fixture Congestion (double-match weeks requiring extensive squad depth rotation)
+- [Foundation implemented] Design/Implement Medical Center Upgrade Effects (readiness recovery)

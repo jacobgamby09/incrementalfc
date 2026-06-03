@@ -2,9 +2,11 @@ import { getStatDefinition } from "../../../domain/player/statDefinitions";
 
 type StatLabelProps = {
   code: string;
+  onClick?: () => void;
+  suffix?: string;
 };
 
-export function StatLabel({ code }: StatLabelProps): JSX.Element {
+export function StatLabel({ code, onClick, suffix = "" }: StatLabelProps): JSX.Element {
   const definition = getStatDefinition(code);
   if (!definition) return <span>{code}</span>;
 
@@ -12,10 +14,12 @@ export function StatLabel({ code }: StatLabelProps): JSX.Element {
     <span className="group relative inline-flex">
       <button
         type="button"
+        onClick={onClick}
         className="rounded px-1 font-semibold underline decoration-dotted underline-offset-4 focus:outline-none focus:ring-2 focus:ring-pitch-500"
         aria-describedby={`stat-${definition.code}-tooltip`}
+        aria-label={onClick ? `Sort by ${definition.code}` : undefined}
       >
-        {definition.code}
+        {definition.code}{suffix}
       </button>
       <span
         id={`stat-${definition.code}-tooltip`}

@@ -1,5 +1,7 @@
 # First Prototype Scope: Football Manager Incremental
 
+> **Status:** Historical scope and living acceptance checklist. The prototype has grown beyond several original recommendations. Current shipped milestones are tracked in [CHANGELOG.md](./CHANGELOG.md), while the active long-term design lives in [core-game-loop-documentation.md](./core-game-loop-documentation.md).
+
 This document defines the scope for the first playable prototype. The goal is to build a small but complete version of the game loop, not a full football manager simulation.
 
 The prototype should prove that the core idea works:
@@ -132,6 +134,9 @@ Recommended first formations:
 - `4-2-3-1`
 - `3-5-2`
 - `5-4-1`
+- `5-3-2`
+- `3-4-3`
+- `3-4-2-1`
 
 Recommended tactical focus options:
 
@@ -140,6 +145,8 @@ Recommended tactical focus options:
 - `fast_breaks`
 - `sustained_pressure`
 - `defensive_shape`
+- `control`
+- `tiki_taka`
 
 Recommended risk levels:
 
@@ -174,11 +181,14 @@ Required chance types:
 - wide cross
 - sustained pressure
 - rebound/big chance
+- corner
+- indirect free kick
+- direct free kick
+- penalty
 
 Can be simplified:
 
-- red cards can be included as simple rare events
-- yellow cards can be cosmetic or omitted
+- red and yellow cards remain deferred
 - goalkeeper pressure can be implemented in a basic form
 - rebound logic can be simple
 
@@ -573,7 +583,7 @@ Recommended table presets:
 - Attributes
 - Performance
 - Contract
-- Development Placeholder
+- Development
 
 Player names should open the shared player detail sheet wherever they appear.
 

@@ -154,6 +154,46 @@ describe("display timeline", () => {
     expect(result[0].rawEventIndexes).toEqual([0, 1]);
   });
 
+  it("renders penalties as their own readable route", () => {
+    const events: MatchEvent[] = [
+      {
+        minute: 72,
+        type: "chance",
+        clubId: "home",
+        playerId: "shooter",
+        secondaryPlayerId: "shooter",
+        description: "Penalty.",
+        chanceType: "penalty",
+        outcome: "created"
+      },
+      {
+        minute: 72,
+        type: "shot",
+        clubId: "home",
+        playerId: "shooter",
+        description: "Shot.",
+        chanceType: "penalty",
+        xg: 0.76,
+        outcome: "scored"
+      },
+      {
+        minute: 72,
+        type: "goal",
+        clubId: "home",
+        playerId: "shooter",
+        description: "Goal.",
+        chanceType: "penalty",
+        xg: 0.76,
+        outcome: "scored"
+      }
+    ];
+
+    const result = display(events);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].text).toContain("GOAL - Ben Spencer scores from a penalty");
+  });
+
   it("does not mutate raw events while grouping", () => {
     const events: MatchEvent[] = [
       {

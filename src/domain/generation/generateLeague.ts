@@ -1,5 +1,11 @@
 import type { League, LeagueTableEntry } from "../types/league";
-import { lowestLeagueStatRange } from "../../data/constants/leagueProfiles";
+import {
+  leagueProfiles,
+  getLeagueIdForLevel,
+  getPromotionSpotsForLevel,
+  getRelegationSpotsForLevel,
+  normalizeLeagueLevel
+} from "../../data/constants/leagueProfiles";
 
 export function createEmptyTable(clubIds: string[]): LeagueTableEntry[] {
   return clubIds.map((clubId) => ({
@@ -15,22 +21,26 @@ export function createEmptyTable(clubIds: string[]): LeagueTableEntry[] {
   }));
 }
 
-export function generateLeague(clubIds: string[]): League {
+export function generateLeague(clubIds: string[], level = 1): League {
+  const norm = normalizeLeagueLevel(level);
+  const profile = leagueProfiles[norm] ?? leagueProfiles[1];
   return {
-    id: "league_lowland_1",
-    name: "Lowland League Division",
-    level: 1,
+    id: getLeagueIdForLevel(norm),
+    name: profile.name,
+    level: profile.level,
     clubIds,
     teamsCount: 10,
     matchesPerSeason: 18,
-    promotionSpots: 2,
-    relegationSpots: 0,
-    playerStatRange: lowestLeagueStatRange,
-    rewardProfile: {
-      participationPrize: 15_000,
-      championPrize: 80_000,
-      promotionBonus: 50_000
-    },
-    facilityCapLimit: 2
+    promotionSpots: getPromotionSpotsForLevel(norm),
+    relegationSpots: getRelegationSpotsForLevel(norm),
+    playerStatRange: profile.playerStatRange,
+    rewardProfile: profile.rewardProfile,
+    facilityCapLimit: profile.facilityCapLimit,
+    targetOvrRange: profile.targetOvrRange,
+    targetPotentialRange: profile.targetPotentialRange,
+    rarePotentialMax: profile.rarePotentialMax,
+    facilityCap: profile.facilityCap,
+    typicalWageRange: profile.typicalWageRange,
+    typicalValueRange: profile.typicalValueRange
   };
 }

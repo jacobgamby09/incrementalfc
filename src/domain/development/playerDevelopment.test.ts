@@ -8,8 +8,10 @@ import type { Player } from "../types/player";
 import { isGoalkeeperStats } from "../types/player";
 import {
   applyDevelopmentXp,
+  allocateDevelopmentPoint,
   calculateMatchXp,
   getDevelopmentCap,
+  getPlayerCapStatus,
   getRecentStatDelta,
   getPlayerDevelopmentSummary,
   runTraining
@@ -40,8 +42,9 @@ describe("player development", () => {
     expect(highRatingXp).toBeGreaterThan(primeXp);
   });
 
-  it("prevents stat growth above personal potential and facility cap", () => {
+  it("converts XP into manual development points without changing stats automatically", () => {
     const player = generatePlayer({ clubId: "club", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9 });
+    player.age = 20;
     player.currentStats = { PAS: 5, SHO: 9, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
     player.potentialStats = { PAS: 5, SHO: 12, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
 
@@ -49,13 +52,52 @@ describe("player development", () => {
 
     expect(isGoalkeeperStats(developed.currentStats)).toBe(false);
     if (isGoalkeeperStats(developed.currentStats)) throw new Error("Expected outfield stats");
-    expect(developed.currentStats.SHO).toBeLessThanOrEqual(10);
+    expect(developed.currentStats.SHO).toBe(9);
+    expect(developed.development.unspentDevelopmentPoints).toBeGreaterThan(0);
+    expect(developed.development.lastDevelopmentPointsGained).toBeGreaterThan(0);
+
+    const allocated = allocateDevelopmentPoint({ player: developed, statKey: "SHO", developmentCap: 10 });
+    if (isGoalkeeperStats(allocated.currentStats)) throw new Error("Expected outfield stats");
+    expect(allocated.currentStats.SHO).toBe(10);
+    expect(allocated.development.unspentDevelopmentPoints).toBe(developed.development.unspentDevelopmentPoints - 1);
+  });
+
+  it("prevents manual allocation above personal potential and facility cap", () => {
+    const player = generatePlayer({ clubId: "club", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9 });
+    player.age = 20;
+    player.currentStats = { PAS: 5, SHO: 10, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
+    player.potentialStats = { PAS: 5, SHO: 12, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
+    player.development.unspentDevelopmentPoints = 1;
+
+    const allocated = allocateDevelopmentPoint({ player, statKey: "SHO", developmentCap: 10 });
+
+    expect(allocated.currentStats).toEqual(player.currentStats);
+    expect(allocated.development.unspentDevelopmentPoints).toBe(1);
+  });
+
+  it("banks XP but prevents new stat growth for players aged 30 or older", () => {
+    const gameState = generateGameState();
+    const club = gameState.clubs[gameState.playerClubId];
+    const player = generatePlayer({ clubId: "club", position: "ST", statRange: lowestLeagueStatRange, age: 30 });
+    player.currentStats = { PAS: 5, SHO: 5, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
+    player.potentialStats = { PAS: 5, SHO: 12, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 12, TEC: 5, PHY: 5, MEN: 5 };
+
+    const developed = applyDevelopmentXp({ player, xpGained: 1000, developmentCap: 20, source: "training" });
+
+    expect(developed.currentStats).toEqual(player.currentStats);
+    expect(getPlayerDevelopmentSummary(developed, club).untappedPotential).toBe(false);
+    expect(getPlayerDevelopmentSummary(developed, club).cappedByPotential).toBe(false);
+    expect(getPlayerDevelopmentSummary(developed, club).nextProgressPercent).toBe(0);
+    expect(getPlayerDevelopmentSummary(developed, club).statRows.every((row) => row.capStatus === "Declining")).toBe(true);
+    expect(getPlayerCapStatus(developed, club)).toBe("Declining");
+    expect(getPlayerDevelopmentSummary(developed, club).notes).toContain("No further stat growth after age 30.");
   });
 
   it("marks facility and potential caps in development summary", () => {
     const gameState = generateGameState();
     const club = gameState.clubs[gameState.playerClubId];
     const player = gameState.players[club.squadPlayerIds.find((playerId) => gameState.players[playerId].primaryPosition === "ST")!];
+    player.age = 20;
     player.currentStats = { PAS: 5, SHO: 10, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
     player.potentialStats = { PAS: 5, SHO: 14, TAC: 5, CRO: 5, HEA: 5, ACC: 5, STA: 5, DRI: 5, POS: 5, TEC: 5, PHY: 5, MEN: 5 };
 

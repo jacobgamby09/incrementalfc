@@ -29,13 +29,13 @@ describe("development presentation", () => {
     expect(summary.topXpGainers.length).toBeGreaterThan(0);
     expect(summary.topXpGainers[0].reasonText.length).toBeGreaterThan(0);
     expect(summary.bankedProgressPlayers.length).toBeGreaterThan(0);
-    expect(summary.bankedProgressLabel).toBe("Progress Banked Toward Next Growth");
+    expect(summary.bankedProgressLabel).toBe("Progress Banked Toward Next Development Point");
     if (summary.improvedPlayers.length === 0) {
-      expect(summary.noGrowthMessage).toBe("Progress was banked, but no player reached a stat increase this match.");
+      expect(summary.noGrowthMessage).toBe("Progress was banked. Assign earned development points from Training, Squad, or the player sheet.");
     }
   });
 
-  it("exposes per-stat progress rows and exact cap status labels", () => {
+  it("exposes per-stat progress rows and exact development status labels", () => {
     const gameState = generateGameState();
     const club = gameState.clubs[gameState.playerClubId];
     const player = gameState.players[club.squadPlayerIds[0]];
@@ -50,7 +50,7 @@ describe("development presentation", () => {
       progressPercent: expect.any(Number),
       capStatus: expect.any(String)
     }));
-    expect(["Developing", "Facility capped", "Potential capped", "Untapped potential"]).toContain(getPlayerCapStatus(player, club));
+    expect(["Developing", "Facility limited", "Potential reached", "Declining"]).toContain(getPlayerCapStatus(player, club));
   });
 
   it("summarizes noisy cap notices and keeps a short example list", () => {
@@ -80,12 +80,12 @@ describe("development presentation", () => {
 
     const summary = getMatchDevelopmentSummary(result.gameState, result.gameState.matches[result.playerMatchId]);
 
-    expect(summary.capSummaries.some((text) => text.includes("players are facility capped"))).toBe(true);
+    expect(summary.capSummaries.some((text) => text.includes("players are limited by the current Training Ground"))).toBe(true);
     expect(summary.capWarningExamples.length).toBeLessThanOrEqual(4);
-    expect(summary.capWarnings.length).toBeGreaterThan(summary.capWarningExamples.length);
+    expect(summary.capWarnings.length).toBeGreaterThanOrEqual(summary.capWarningExamples.length);
   });
 
-  it("adds stat increase badges to top XP gainers", () => {
+  it("adds development point badges to top XP gainers", () => {
     const gameState = generateGameState();
     const club = gameState.clubs[gameState.playerClubId];
     const playerId = club.squadPlayerIds[0];
@@ -100,6 +100,20 @@ describe("development presentation", () => {
       playerTactic: club.tactics.activeTactic,
       rng: () => 0.42
     });
+    const playerWithPoint = {
+      ...result.gameState.players[playerId],
+      development: {
+        ...result.gameState.players[playerId].development,
+        lastDevelopmentPointsGained: 1
+      }
+    };
+    const stateWithPoint = {
+      ...result.gameState,
+      players: {
+        ...result.gameState.players,
+        [playerId]: playerWithPoint
+      }
+    };
     const match = {
       ...result.gameState.matches[result.playerMatchId],
       rewards: {
@@ -122,9 +136,9 @@ describe("development presentation", () => {
       }
     };
 
-    const summary = getMatchDevelopmentSummary(result.gameState, match);
+    const summary = getMatchDevelopmentSummary(stateWithPoint, match);
 
     expect(summary.topXpGainers[0].playerId).toBe(playerId);
-    expect(summary.topXpGainers[0].statIncreaseBadges).toEqual(["+1 CRO"]);
+    expect(summary.topXpGainers[0].statIncreaseBadges).toEqual(["+1 Development Point", "+1 CRO"]);
   });
 });

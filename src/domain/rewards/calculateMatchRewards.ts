@@ -4,6 +4,7 @@ import type { Lineup, Tactic } from "../types/tactics";
 import type { GameState } from "../types/game";
 import { createMatchXpRewards } from "../development/playerDevelopment";
 import { getTacticKey } from "../tactics/tacticFamiliarity";
+import { economyProfile } from "../../data/constants/economyProfiles";
 
 type CalculateMatchRewardsOptions = {
   club: Club;
@@ -35,9 +36,13 @@ export function calculateMatchRewards({
   gameState
 }: CalculateMatchRewardsOptions): MatchRewards {
   const multiplier = resultMultiplier(goalsFor, goalsAgainst);
-  const attendanceIncome = isHome ? club.economy.matchdayIncomeEstimate : Math.round(club.economy.matchdayIncomeEstimate * 0.35);
   const reputationGapBonus = Math.max(opponentClub.reputation - club.reputation, 0) * 20;
-  const money = Math.round((attendanceIncome + reputationGapBonus) * multiplier);
+  const baseResultBonus = goalsFor > goalsAgainst
+    ? economyProfile.resultBonuses.win
+    : goalsFor === goalsAgainst
+      ? economyProfile.resultBonuses.draw
+      : economyProfile.resultBonuses.loss;
+  const money = Math.round(baseResultBonus + reputationGapBonus * multiplier);
   const fans = Math.max(5, Math.round((goalsFor > goalsAgainst ? 45 : goalsFor === goalsAgainst ? 18 : 8) * multiplier));
   const reputation = Number((goalsFor > goalsAgainst ? 0.18 : goalsFor === goalsAgainst ? 0.06 : 0.02).toFixed(2));
   const playerXp: Record<string, PlayerXpReward> =

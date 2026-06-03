@@ -7,6 +7,7 @@ import { getTacticFamiliarity, getTacticFamiliarityModifier } from "../tactics/t
 import { focusProfiles, formationProfiles, riskProfiles, type PhaseKey } from "../tactics/tacticalProfiles";
 import type { PlayerPosition } from "../types/player";
 import { getOutfieldStatValue } from "../player/statAccess";
+import { getPlayerFitness, effectiveFitnessModifier } from "../fitness/playerFitness";
 
 export type PhaseStrengths = {
   midfield: number;
@@ -63,13 +64,16 @@ function phaseContribution(
   const slotWeight = slotPhaseWeights[slotPosition][phase];
   const value = (key: keyof OutfieldStats) => getOutfieldStatValue(stats, key);
 
+  const fitness = getPlayerFitness(player);
+  const fitnessModifier = effectiveFitnessModifier(fitness);
+
   if (phase === "midfield") {
-    return average([value("PAS"), value("TEC"), value("POS"), value("MEN")]) * slotWeight * fitModifier;
+    return average([value("PAS"), value("TEC"), value("POS"), value("MEN")]) * slotWeight * fitModifier * fitnessModifier;
   }
   if (phase === "attack") {
-    return average([value("SHO"), value("CRO"), value("ACC"), value("DRI"), value("POS"), value("TEC"), value("HEA")]) * slotWeight * fitModifier;
+    return average([value("SHO"), value("CRO"), value("ACC"), value("DRI"), value("POS"), value("TEC"), value("HEA")]) * slotWeight * fitModifier * fitnessModifier;
   }
-  return average([value("TAC"), value("POS"), value("PHY"), value("HEA"), value("STA"), value("MEN")]) * slotWeight * fitModifier;
+  return average([value("TAC"), value("POS"), value("PHY"), value("HEA"), value("STA"), value("MEN")]) * slotWeight * fitModifier * fitnessModifier;
 }
 
 function calculateOutfieldPhase(
@@ -103,13 +107,14 @@ export function calculatePhaseStrengths(
   const defence = calculateOutfieldPhase(outfieldSlots, tactic, "defence");
 
   const goalkeeperStrength = goalkeeperSlot ? goalkeeperStats(goalkeeperSlot.player) : undefined;
+  const gkFitnessModifier = goalkeeperSlot ? effectiveFitnessModifier(getPlayerFitness(goalkeeperSlot.player)) : 1;
 
   return {
     midfield: midfield * familiarityModifier * (isHome ? 1.03 : 1),
     attack: attack * familiarityModifier,
     defence: defence * familiarityModifier,
     goalkeeper: goalkeeperStrength
-      ? average([goalkeeperStrength.REF, goalkeeperStrength.HAN, goalkeeperStrength.MEN]) * homeMentalityModifier
+      ? average([goalkeeperStrength.REF, goalkeeperStrength.HAN, goalkeeperStrength.MEN]) * homeMentalityModifier * gkFitnessModifier
       : 1,
     familiarity,
     averageMentality:

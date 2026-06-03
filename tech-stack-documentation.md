@@ -1,5 +1,7 @@
 # Tech Stack Documentation: Football Manager Incremental
 
+> **Status:** Stack decision record and architectural guide. The stack remains current, but the project structure below is illustrative rather than an exact filesystem inventory. Shipped milestones are tracked in [CHANGELOG.md](./CHANGELOG.md).
+
 This document defines the recommended tech stack for the first playable prototype and the architectural principles that should guide implementation.
 
 The goal is to build a fast, testable, browser-based single-player prototype with a strong simulation core and a clear management UI.
@@ -205,6 +207,8 @@ The first version should not require a server.
 ---
 
 ## 9. Recommended Project Structure
+
+The repository has grown beyond this initial outline. Keep using it as an ownership guide rather than a literal directory manifest.
 
 ```text
 src/

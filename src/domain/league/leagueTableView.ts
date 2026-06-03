@@ -41,3 +41,12 @@ export function sortLeagueTable(entries: LeagueTableEntry[], gameState: GameStat
     return gameState.clubs[left.clubId].name.localeCompare(gameState.clubs[right.clubId].name);
   });
 }
+
+export function sortTableCanonically(entries: LeagueTableEntry[]): LeagueTableEntry[] {
+  return [...entries].sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
+    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+    return a.clubId.localeCompare(b.clubId);
+  });
+}

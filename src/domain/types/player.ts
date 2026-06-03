@@ -1,3 +1,5 @@
+import type { SaleStrategy } from "./transfer";
+
 export type OutfieldStats = {
   PAS: number;
   SHO: number;
@@ -48,15 +50,25 @@ export type PlayerRole =
   | "target_forward"
   | "pressing_forward";
 
+export type SquadRole =
+  | "key_player"
+  | "regular_starter"
+  | "rotation"
+  | "backup"
+  | "prospect";
+
 export type PlayerDevelopment = {
   trainingXp: number;
   matchXp: number;
   developmentRate: number;
   ageCurveStage: "youth" | "developing" | "prime" | "declining";
+  unspentDevelopmentPoints: number;
+  developmentPointProgress: number;
   cappedStats: string[];
   statProgress: Record<string, number>;
   lastMatchXpGained: number;
   lastTrainingXpGained: number;
+  lastDevelopmentPointsGained: number;
   recentStatGrowth: PlayerStatGrowth[];
   recentDevelopmentNotes: string[];
 };
@@ -71,7 +83,7 @@ export type PlayerStatGrowth = {
 
 export type PlayerContract = {
   wagePerWeek: number;
-  weeksRemaining: number;
+  seasonsRemaining: number;
   marketValue: number;
   releaseClause?: number;
 };
@@ -107,6 +119,14 @@ export type PlayerVisualIdentity = {
   kitNumber: number;
 };
 
+export type PlayerTransferIntent = {
+  isListed: boolean;
+  listingReason?: "financial_pressure" | "player_unhappy" | "contract_declining" | "too_good_for_division" | "excess_squad" | "player_listed" | "none";
+  saleStrategy?: SaleStrategy;
+  askingPrice: number;
+  interestLevel: number; // 0-100
+};
+
 export type Player = {
   id: string;
   firstName: string;
@@ -117,6 +137,8 @@ export type Player = {
   primaryPosition: PlayerPosition;
   secondaryPositions: PlayerPosition[];
   preferredRole?: PlayerRole;
+  squadRole: SquadRole;
+  marketReputation: number;
   currentStats: OutfieldStats | GoalkeeperStats;
   potentialStats: OutfieldStats | GoalkeeperStats;
   development: PlayerDevelopment;
@@ -124,6 +146,7 @@ export type Player = {
   status: PlayerStatus;
   history: PlayerHistory;
   visualIdentity: PlayerVisualIdentity;
+  transferIntent: PlayerTransferIntent;
 };
 
 export const outfieldStatKeys = [

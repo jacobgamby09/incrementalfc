@@ -4,7 +4,7 @@ import { autoSelectLineup, validateLineup } from "../lineup/selectLineup";
 import type { LeagueTableEntry } from "../types/league";
 import type { Match } from "../types/match";
 import type { Lineup } from "../types/tactics";
-import { playMatchday } from "./playMatchday";
+import { adjustAITactic, playMatchday } from "./playMatchday";
 import { updateLeagueTable } from "./updateLeagueTable";
 
 function emptyEntry(clubId: string): LeagueTableEntry {
@@ -50,7 +50,11 @@ function makeMatch(homeGoals: number, awayGoals: number): Match {
           fast_breakaway: 0,
           wide_cross: 0,
           sustained_pressure: 0,
-          rebound_big_chance: 0
+          rebound_big_chance: 0,
+          corner: 0,
+          indirect_free_kick: 0,
+          direct_free_kick: 0,
+          penalty: 0
         }
       },
       awayStats: {
@@ -66,7 +70,11 @@ function makeMatch(homeGoals: number, awayGoals: number): Match {
           fast_breakaway: 0,
           wide_cross: 0,
           sustained_pressure: 0,
-          rebound_big_chance: 0
+          rebound_big_chance: 0,
+          corner: 0,
+          indirect_free_kick: 0,
+          direct_free_kick: 0,
+          penalty: 0
         }
       },
       keyProblems: [],
@@ -163,5 +171,33 @@ describe("playing a matchday", () => {
 
     expect(validateLineup(lineup, gameState, playerClub.id).valid).toBe(true);
     expect(validateLineup(duplicateLineup, gameState, playerClub.id).valid).toBe(false);
+  });
+});
+
+describe("AI tactical reactions", () => {
+  it("uses a temporary defensive reaction during a losing run", () => {
+    const gameState = generateGameState();
+    const club = Object.values(gameState.clubs).find((candidate) => candidate.id !== gameState.playerClubId)!;
+    club.seasonStats.formLastFive = ["L", "L", "L"];
+
+    const tactic = adjustAITactic(club, () => 0);
+
+    expect(tactic.focus).toBe("defensive_shape");
+    expect(tactic.riskLevel).toBe("conservative");
+  });
+
+  it("returns to the saved club identity after the crisis passes", () => {
+    const gameState = generateGameState();
+    const club = Object.values(gameState.clubs).find((candidate) => candidate.id !== gameState.playerClubId)!;
+    const baseTactic = club.tactics.savedTactics[0];
+    club.tactics.activeTactic = {
+      ...baseTactic,
+      formation: "5-4-1",
+      focus: "defensive_shape",
+      riskLevel: "conservative"
+    };
+    club.seasonStats.formLastFive = ["W", "D", "L"];
+
+    expect(adjustAITactic(club, () => 0.99)).toEqual(baseTactic);
   });
 });

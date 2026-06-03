@@ -16,7 +16,11 @@ function stats(overrides: Partial<MatchTeamStats>): MatchTeamStats {
       fast_breakaway: 0,
       wide_cross: 0,
       sustained_pressure: 0,
-      rebound_big_chance: 0
+      rebound_big_chance: 0,
+      corner: 0,
+      indirect_free_kick: 0,
+      direct_free_kick: 0,
+      penalty: 0
     },
     ...overrides
   };
@@ -39,7 +43,11 @@ describe("match report feedback", () => {
           fast_breakaway: 0,
           wide_cross: 1,
           sustained_pressure: 4,
-          rebound_big_chance: 1
+          rebound_big_chance: 1,
+          corner: 0,
+          indirect_free_kick: 0,
+          direct_free_kick: 0,
+          penalty: 0
         }
       }),
       opponentStats: stats({
@@ -52,7 +60,11 @@ describe("match report feedback", () => {
           fast_breakaway: 4,
           wide_cross: 0,
           sustained_pressure: 1,
-          rebound_big_chance: 0
+          rebound_big_chance: 0,
+          corner: 0,
+          indirect_free_kick: 0,
+          direct_free_kick: 0,
+          penalty: 0
         }
       })
     });

@@ -84,12 +84,173 @@ Regular season
 End of season
 -> Final placement rewards
 -> Promotion/relegation
+-> League ecosystem update
 -> Contract and wage review
+-> Transfer candidate generation
 -> Sponsor/reputation update
 -> New league standards if promoted
 ```
 
 It should be realistic and expected that a player may spend multiple seasons in the same league before being strong enough to promote.
+
+### League Ecosystem Principle
+
+The league should feel alive without becoming a parallel incremental grind for every AI club.
+
+AI clubs should not simply train every week at the same pace as the player. That creates a "Red Queen" effect where the player upgrades but never feels relatively stronger.
+
+Instead, the world should use bounded ecosystem progression:
+
+```text
+Division strength bands define the natural level of each league.
+AI clubs move within those bands based on ambition, finances, promotion/relegation, and squad churn.
+The player can outsmart and outbuild the league through better tactics, development, scouting, and spending.
+Lower divisions should not inflate forever just because many seasons pass.
+```
+
+This preserves the incremental fantasy:
+
+```text
+The player can become too strong for a division,
+but the entire division should not automatically rise in lockstep.
+```
+
+### Milestone 4.2.4 Persistent Football World
+
+The league ecosystem now exists as one persistent five-division English pyramid:
+
+| Level | Division | Clubs |
+| --- | --- | ---: |
+| 1 | Local League | 10 |
+| 2 | Regional League | 10 |
+| 3 | National League | 10 |
+| 4 | Championship | 10 |
+| 5 | Premier League | 10 |
+
+All 50 fictional clubs are generated at new-game creation and remain in the save. Promotion and relegation exchange existing clubs between adjacent divisions instead of generating replacement opponents. Club identity, squads, facilities, finances, and history follow the club.
+
+The player's division continues to use the full match engine. The four offscreen divisions use lightweight strength-based standings during rollover so the wider world remains alive without simulating every fixture in detail.
+
+Player generation is nationality-aware. Lower divisions remain predominantly English with a smaller Home Nations and Irish presence. Higher divisions gradually become more international, using configurable country weights inspired by the composition of English top-flight football. Nationality is currently an identity and scouting foundation rather than a gameplay modifier.
+
+Recommended timing:
+
+```text
+During season:
+- AI form updates through match results.
+- AI may make very light tactical reactions.
+- AI squad strength should not meaningfully grind upward every week.
+
+End of season:
+- Aging and decline.
+- AI squad refresh.
+- Promotion/relegation adjustment.
+- Financial pressure updates.
+- Transfer candidate generation.
+- Division band correction.
+```
+
+### Milestone 3.4 Implementation Details
+
+In Milestone 3.4, the season rollover and league ecosystem were fully implemented:
+
+1. **Division Strength Bands**:
+   Each of the 5 league tiers has defined boundaries:
+   - `targetOvrRange` (e.g., Tier 1: [1, 10], Tier 5: [40, 70])
+   - `targetPotentialRange` (e.g., Tier 1: [6, 10], Tier 5: [60, 80])
+   - `facilityCap` (Tier 1: 10, Tier 5: 50)
+   - `typicalWageRange` and `typicalValueRange`
+
+2. **AI Club Archetypes**:
+   Every AI club has an archetype (`ambitious`, `stable`, `youth_development`, `veteran`, `financially_cautious`) that influences squad composition and rollover behavior.
+
+3. **Season Rollover Execution**:
+   - **Financials**: Distributes placement rewards (participation, champion, and promotion bonuses).
+   - **Promotion/Relegation**: Shifts teams between divisions, adjusting their economics and facility caps.
+   - **Aging**: Increments all player ages. Players >= 30 suffer physical decline (`ACC`, `STA`, `PHY` drop by 1-2 points) and small mental/technical decay chances.
+   - **Squad Refresh**: AI clubs retire players >= 35, list/remove division outliers, and recruit young prospects (age 17-20) matching the division profile to maintain at least 16 players.
+   - **Transfer Pool**: A curated pool of Free Agents and Listed Players is generated and tracked in `gameState.transferMarket`.
+
+### Milestone 3.4.1 Stabilization Details
+
+In Milestone 3.4.1, the league identity and season rollover were stabilized:
+
+1. **Fixed Divisions Hierarchy**:
+   The game formalised five divisions:
+   * Level 1: **Local League** (no relegation, starting tier)
+   * Level 2: **Regional League**
+   * Level 3: **National League**
+   * Level 4: **Championship**
+   * Level 5: **Premier League** (no promotion, top tier)
+
+2. **Premier League and Local League Safeguards**:
+   * Premier League champion stays in the division instead of being removed from the active league. Promotion spots are set to 0.
+   * Local League clubs cannot relegate. Relegation spots are set to 0.
+
+3. **Ecosystem & Roll Over Corrections**:
+   * **State Purity**: Deep clones all mutable data structures (clubs, players, economics, facilities, stats) to ensure `rollOverSeason` is pure.
+   * **Exemption from Aging**: Newly generated opponent clubs and mid-rollover replacement players do not age or receive decline notes immediately on their generation rollover.
+   * **Preservation of Decline Notes**: Veteran decline notes are preserved instead of being immediately cleared.
+   * **Canonical Table Sorting**: Leverages `sortTableCanonically` to ensure table sorting is stable and consistent across UI ranks and payouts.
+
+### Milestone 4.2.0 Transfer Window Foundation
+
+Season rollover now has a staged offseason:
+
+1. The completed season pays rewards, applies league shifts, ages players, processes contract expiry, and prepares the next season.
+2. A 3-week transfer window opens with 5 configured future transfer actions.
+3. The Dashboard allows the player to inspect the market, advance weeks, and finalize the window.
+4. Prepared fixtures remain locked until the transfer window closes.
+5. Contracts are displayed and processed in seasons rather than weeks.
+
+Selling and lightweight AI offers are added in Milestone 4.2.3.
+
+### Milestone 4.2.1 Player Context
+
+Players now carry readable context for future transfer decisions:
+
+- `marketReputation`: a visible 1-100 profile value distinct from OVR.
+- `squadRole`: Key Player, Regular Starter, Rotation, Backup, or Prospect.
+- `morale`: stored internally from 0-100 and displayed as Thriving, Happy, Content, Frustrated, or Disengaged.
+
+After each matchday, morale responds moderately to the result, expected playing time, and expiring contracts. Market reputation changes slowly after notable ratings, goals, and assists. All tuning values live in `playerContextProfiles.ts`.
+
+### Milestone 4.2.2 Buying and Contract Renewals
+
+The offseason market now supports curated purchases and squad contract renewals:
+
+1. The player opens a listed player, free agent, or existing squad player from the Market screen.
+2. The player chooses a promised squad role, a 1-3 season contract, and one of four offer packages: Lowball, Cautious, Fair, or Statement.
+3. Every submitted offer consumes one offseason action.
+4. Willingness is calculated from readable football context: interest or morale, club reputation, league movement, promised role, contract length, and package strength.
+5. Accepted signings immediately update the squad, wage, contract, transfer fee, and curated market pool.
+6. Lowball offers consume more negotiation patience and can collapse talks.
+
+All tuning values live in `transferProfiles.ts`.
+
+### Milestone 4.2.3 Selling and Lightweight AI Activity
+
+The player can now turn squad assets into offseason income without entering a heavy negotiation simulator:
+
+1. Open `My Listings` and select a contracted squad player.
+2. Choose `Quick Sale`, `Market Price`, or `Hold Out`.
+3. AI clubs that can afford the player may submit a one-week offer. Buyer priority responds to squad need, squad depth, and club archetype.
+4. Accepting an offer moves the player, updates both squads and cash balances, and records both finance-ledger entries.
+5. Selling does not consume a limited signing action.
+6. A sale cannot leave the player club with fewer than 11 contracted players.
+
+AI tactical reactions remain lightweight and temporary. A poor run can trigger a conservative `defensive_shape` response, but the club returns to its saved tactical identity when the crisis passes. This prevents long saves from drifting toward a league-wide defensive lock.
+
+### Milestone 4.2.2.2 Season Loop Stabilization
+
+Longer playtests added a small but important offseason safety pass:
+
+1. All active squads recover to `100` readiness during the offseason.
+2. Fixture schedules remain round-robin home-and-away schedules, but no club receives more than two consecutive fixtures at the same venue.
+3. Player-club contracts that reach zero seasons receive an offseason grace period instead of removing the player immediately.
+4. The next season cannot begin while expired player-club contracts remain unresolved or fewer than 11 contracted players are available.
+5. Contract-renewal offers keep their negotiation patience but no longer consume the limited signing-action pool.
+6. Player sheets expose current season performance and compact prior-season history.
 
 ---
 
@@ -115,6 +276,24 @@ Promotion should not mean:
 - the player is guaranteed to compete immediately
 
 The player should often promote and then discover that their old squad is no longer enough. This creates a natural new challenge without deleting the progress they already earned.
+
+### Promotion/Relegation and AI Clubs
+
+Promotion and relegation should gradually change an AI club's environment, not instantly rewrite its entire squad.
+
+Promoted AI clubs:
+
+- gain access to better income and attraction
+- may slowly move toward the new division strength band
+- can still struggle if their squad is below the new level
+
+Relegated AI clubs:
+
+- may face financial pressure
+- may list or lose players above the lower division's level
+- should not instantly become weak, but should gradually adapt downward
+
+This supports realistic multi-season movement without making all divisions converge to the same quality.
 
 ### Long-Term Challenge Metric
 
@@ -324,6 +503,14 @@ This creates meaningful choices:
 - invest heavily in training infrastructure
 - use the player now even while development is temporarily capped
 
+### Fixed Potential and Development Windows
+
+Personal potential is a fixed talent ceiling generated independently of the player's current league and the club's facilities. A rare Local League prospect can therefore carry elite upside even when his current club can only train stats to `10-12`.
+
+Facilities remain the natural short-term restriction. Age controls the speed and availability of development rather than rewriting a player's innate ceiling. Players aged `30+` retain their historical real POT but receive no further normal stat growth.
+
+Signed players reveal their exact `POT`. External transfer targets and unsigned academy prospects show a scout-based `Est. POT` interval instead. Better Scouting Department levels narrow the interval and increase report confidence.
+
 ---
 
 ## 6. Player Stat Ranges by League
@@ -456,6 +643,62 @@ Recurring commitments include:
 
 This allows aggressive short-term spending, but creates risk if the club's wage commitments become too high.
 
+### Milestone 4.0 Economy Foundation
+
+The first playable club-building economy is config-driven. Balance values live in centralized profiles so playtesting can tune pacing without rewriting screens or domain logic.
+
+The active facilities are:
+
+| Facility | Main purpose |
+| --- | --- |
+| Training Ground | Development cap, baseline squad training XP bonus, focused training slots |
+| Stadium | Capacity, home gate receipts, lost-demand signal |
+| Medical Center | Readiness recovery |
+| Scouting Department | Market pool size and future information quality |
+| Youth Academy | Idle-style intake progress and prospect quality bias |
+
+`Analytics Department` remains a deferred placeholder for future opposition-report depth.
+
+Each upgrade has:
+
+```text
+upfront cost
+weekly upkeep
+construction duration in weeks
+current and next-level effects
+```
+
+Construction advances once after each matchday. Season rollover advances exactly two offseason weeks. Those offseason weeks also process baseline income, wages, and facility upkeep, but no gate receipts.
+
+Weekly finances are split into:
+
+```text
+baseline recurring income
++ home-only gate receipts
++ sporting result bonus
+- player wages
+- staff wage placeholder
+- facility upkeep
+```
+
+Away fixtures produce no gate receipts. Stadium demand is intentionally visible:
+
+```text
+supporter base
+hype from recent results
+attendance rate
+estimated demand
+attendance
+capacity
+occupancy
+lost demand
+lost potential ticket revenue
+```
+
+Fans represent the club's long-term supporter base. They are not identical to match attendance. Reputation, opponent appeal, and short-term hype influence how much of the supporter base turns up for a specific home fixture. This prevents Stadium from becoming an automatic first-purchase money generator: capacity only matters when the club can create real demand.
+
+The Youth Academy is the first explicit idle generator. When progress reaches `100%`, the club receives a pending prospect. The player must choose `Sign Prospect` or `Release`. Prospects never auto-join the squad.
+
 ### Financial Tradeoffs
 
 ```text
@@ -498,8 +741,21 @@ Possible Tactical Focus options:
 - fast breaks
 - sustained pressure
 - defensive shape
+- control
+- tiki-taka
 
 These choices should connect directly to the match engine's chance types.
+
+Implemented formations:
+
+- `4-4-2`
+- `4-3-3`
+- `4-2-3-1`
+- `3-5-2`
+- `5-4-1`
+- `5-3-2`
+- `3-4-3`
+- `3-4-2-1`
 
 ---
 
@@ -582,9 +838,21 @@ The long-term target should be approximately:
 
 This does not need to be exact every week or every player. It is a design target so both systems matter.
 
+Development now uses manual stat allocation:
+
+```text
+Match XP + Training XP -> Development Point progress -> unspent Development Point -> player assigns +1 to an eligible stat
+```
+
+The match/training systems decide how quickly a player earns points. The player decides where those points are spent. Manual allocation is restricted by stat-specific potential, the current Training Ground development cap, and age. Players aged `30+` do not earn normal Development Points, while age decline can still reduce stats automatically.
+
 ### Training XP
 
 Training XP is stable, controllable, and club-driven.
+
+Every owned player receives baseline squad training XP each week. The Training Ground also unlocks a limited number of focused training slots. Assigned players receive a config-driven XP multiplier toward their next Development Point.
+
+Focused slots accelerate selected development projects without replacing baseline squad training. They do not select a stat, force an automatic stat increase, or apply a program identity; they only speed up progress toward the next Development Point, which the player can then allocate manually.
 
 Influenced by:
 
@@ -668,6 +936,49 @@ Investing in scouting improves:
 - chance of discovering rare high-potential outliers
 
 Scouting should reveal information gradually. A low scout might only show current stats. A better scout might estimate potential, wage expectations, personality, and role fit.
+
+---
+
+## 14.5 Transfers and Ecosystem Foundation
+
+Transfers should eventually be one of the main bridges between football realism and incremental progression.
+
+Recommended implementation path:
+
+```text
+Phase 1:
+Generate a curated transfer candidate pool from the league ecosystem.
+
+Phase 2:
+Allow the player to buy from that curated market with wage and reputation gates.
+
+Phase 3:
+Allow "approach any player" with realistic club/player willingness checks.
+```
+
+The first transfer foundation should not be a random shop. Candidate players should emerge from realistic causes:
+
+- free agents
+- players listed by financially pressured clubs
+- players from relegated clubs
+- older players being moved on
+- players above their current club's division level
+- youth prospects or scouting finds
+- squad surplus by position
+
+Buying should eventually require both club and player agreement.
+
+The player should not be able to simply buy the best players because they have enough cash. Willingness should consider:
+
+- league level
+- club reputation
+- player wage expectation
+- expected playing time
+- current club ambition
+- whether the move is a step up or down
+- contract length and market value
+
+The transfer system should reward scouting, financial planning, and timing, not brute-force spending.
 
 ---
 

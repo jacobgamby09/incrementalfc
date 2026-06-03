@@ -10,6 +10,7 @@ import {
   type PlayerPosition
 } from "../types/player";
 import { getOutfieldStatValue } from "./statAccess";
+import { getRealPotentialStats } from "./playerPotential";
 
 export type PlayerRatingHistoryEntry = {
   matchId: string;
@@ -32,6 +33,11 @@ export type PlayerPerformanceSummary = {
     lastRating: string;
     form: string;
   };
+};
+
+export type PlayerSeasonSummary = PlayerPerformanceSummary & {
+  seasonId: string;
+  seasonNumber: number;
 };
 
 export type PlayerMatchContext = {
@@ -85,13 +91,15 @@ export function calculatePlayerOvr(player: Player): number {
   return roundTo(value, 1);
 }
 
-export function calculatePlayerPot(player: Player): number {
-  const stats = player.potentialStats;
+export function calculatePlayerRealPot(player: Player): number {
+  const stats = getRealPotentialStats(player);
   const value = isGoalkeeperStats(stats)
     ? goalkeeperRating(stats)
     : outfieldRating(stats, player.primaryPosition);
   return roundTo(value, 1);
 }
+
+export const calculatePlayerPot = calculatePlayerRealPot;
 
 function fixtureForMatch(gameState: GameState, seasonId: string, match: Match): Fixture | undefined {
   return gameState.seasons[seasonId]?.fixtures.find((fixture) => fixture.id === match.fixtureId);
@@ -148,6 +156,17 @@ export function getPlayerPerformanceSummary(
       form: formLastFive.length === 0 ? "-" : formLastFive.map((rating) => rating.toFixed(1)).join(" ")
     }
   };
+}
+
+export function getPlayerSeasonHistory(gameState: GameState, playerId: string): PlayerSeasonSummary[] {
+  return Object.values(gameState.seasons)
+    .map((season) => ({
+      ...getPlayerPerformanceSummary(gameState, playerId, season.id),
+      seasonId: season.id,
+      seasonNumber: season.seasonNumber
+    }))
+    .filter((summary) => summary.apps > 0)
+    .sort((left, right) => right.seasonNumber - left.seasonNumber);
 }
 
 export function keyPlayerStatsSummary(stats: PlayerMatchStats): string {

@@ -3,14 +3,18 @@ import { generateFixtures } from "./generateFixtures";
 import { generateGameState } from "./generateGameState";
 import { generatePlayer } from "./generatePlayer";
 import { lowestLeagueStatRange } from "../../data/constants/leagueProfiles";
+import { nationalityProfiles } from "../../data/constants/worldProfiles";
+import { playerFullName } from "./playerNameRegistry";
 
 describe("generated world", () => {
-  it("creates a 10-club league", () => {
+  it("creates a persistent five-division pyramid with 10 clubs per league", () => {
     const gameState = generateGameState();
-    const league = Object.values(gameState.leagues)[0];
 
-    expect(league.clubIds).toHaveLength(10);
-    expect(Object.values(gameState.clubs)).toHaveLength(10);
+    expect(Object.values(gameState.leagues)).toHaveLength(5);
+    expect(Object.values(gameState.clubs)).toHaveLength(50);
+    for (const league of Object.values(gameState.leagues)) {
+      expect(league.clubIds).toHaveLength(10);
+    }
   });
 
   it("creates at least 16 players for each club", () => {
@@ -50,6 +54,26 @@ describe("generated world", () => {
     expect(pairDirections.size).toBe(45);
     for (const directions of pairDirections.values()) {
       expect(directions.size).toBe(2);
+    }
+  });
+
+  it("avoids long home and away streaks in the fixture schedule", () => {
+    const clubIds = Array.from({ length: 10 }, (_, index) => `club_${index + 1}`);
+    const fixtures = generateFixtures(clubIds, "season_test");
+
+    for (const clubId of clubIds) {
+      const venues = fixtures
+        .filter((fixture) => fixture.homeClubId === clubId || fixture.awayClubId === clubId)
+        .sort((left, right) => left.matchday - right.matchday)
+        .map((fixture) => fixture.homeClubId === clubId ? "home" : "away");
+      let longestStreak = 1;
+      let currentStreak = 1;
+      for (let index = 1; index < venues.length; index += 1) {
+        currentStreak = venues[index] === venues[index - 1] ? currentStreak + 1 : 1;
+        longestStreak = Math.max(longestStreak, currentStreak);
+      }
+
+      expect(longestStreak).toBeLessThanOrEqual(2);
     }
   });
 
@@ -97,6 +121,24 @@ describe("generated world", () => {
     expect("STA" in goalkeeper.currentStats).toBe(false);
     expect("DRI" in goalkeeper.currentStats).toBe(false);
     expect("POS" in goalkeeper.currentStats).toBe(false);
+  });
+
+  it("preserves unrestricted personal potential rolls regardless of player age", () => {
+    const veteran = generatePlayer({
+      clubId: "club_test",
+      position: "CM",
+      statRange: lowestLeagueStatRange,
+      age: 32,
+      rng: () => 0.5
+    });
+
+    let hasRemainingUpside = false;
+    for (const [key, potential] of Object.entries(veteran.potentialStats)) {
+      const current = veteran.currentStats[key as keyof typeof veteran.currentStats];
+      expect(potential).toBeGreaterThanOrEqual(current);
+      if (potential > current) hasRemainingUpside = true;
+    }
+    expect(hasRemainingUpside).toBe(true);
   });
 
   it("adds visual identity to every generated club", () => {
@@ -157,9 +199,9 @@ describe("generated world", () => {
       )
     });
 
-    expect(Object.values(gameState.clubs).length).toBe(10);
+    expect(Object.values(gameState.clubs).length).toBe(50);
     expect(gameState.seasons[gameState.currentSeasonId].fixtures.length).toBe(90);
-    expect(Object.values(gameState.players).length).toBeGreaterThanOrEqual(160);
+    expect(Object.values(gameState.players).length).toBeGreaterThanOrEqual(800);
 
     const nextVisualSnapshot = JSON.stringify({
       clubs: Object.fromEntries(
@@ -194,5 +236,43 @@ describe("generated world", () => {
 
     expect(facility.level).not.toBe(originalVisualTier);
     expect(facility.visualState.visualTier).toBe(originalVisualTier);
+  });
+
+  it("generates nationality-aware player names with an English majority in the Local League", () => {
+    const gameState = generateGameState();
+    const localLeague = gameState.leagues.league_local_1;
+    const localPlayers = localLeague.clubIds.flatMap((clubId) =>
+      gameState.clubs[clubId].squadPlayerIds.map((playerId) => gameState.players[playerId])
+    );
+    const englishPlayers = localPlayers.filter((player) => player.nationality === "England");
+
+    expect(englishPlayers.length / localPlayers.length).toBeGreaterThan(0.6);
+    expect(localPlayers.every((player) => player.nationality && player.nationality !== "Fictional")).toBe(true);
+  });
+
+  it("uses broad nationality name pools to reduce repeated generated names", () => {
+    expect(nationalityProfiles.England.firstNames.length).toBeGreaterThanOrEqual(50);
+    expect(nationalityProfiles.England.lastNames.length).toBeGreaterThanOrEqual(80);
+    for (const profile of Object.values(nationalityProfiles)) {
+      expect(profile.firstNames.length).toBeGreaterThanOrEqual(12);
+      expect(profile.lastNames.length).toBeGreaterThanOrEqual(12);
+    }
+
+    const gameState = generateGameState();
+    const fullNames = Object.values(gameState.players).map((player) => `${player.firstName} ${player.lastName}`);
+    const uniqueNameRatio = new Set(fullNames).size / fullNames.length;
+
+    expect(uniqueNameRatio).toBeGreaterThan(0.9);
+  });
+
+  it("does not generate duplicate full player names across the persistent world", () => {
+    const gameState = generateGameState();
+    const fullNames = Object.values(gameState.players).map(playerFullName);
+    const uniqueFullNames = new Set(fullNames);
+    const highestSurnameCount = Math.max(...Object.values(gameState.nameRegistry?.surnameCounts ?? {}));
+
+    expect(uniqueFullNames.size).toBe(fullNames.length);
+    expect(gameState.nameRegistry?.usedFullNames.length).toBe(fullNames.length);
+    expect(highestSurnameCount).toBeLessThanOrEqual(12);
   });
 });

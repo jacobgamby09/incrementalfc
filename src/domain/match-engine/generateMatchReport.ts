@@ -32,6 +32,10 @@ function labelChanceType(chanceType: ChanceType): string {
   if (chanceType === "fast_breakaway") return "fast breakaways";
   if (chanceType === "wide_cross") return "wide crosses";
   if (chanceType === "rebound_big_chance") return "rebounds and big chances";
+  if (chanceType === "corner") return "corners";
+  if (chanceType === "indirect_free_kick") return "indirect free kicks";
+  if (chanceType === "direct_free_kick") return "direct free kicks";
+  if (chanceType === "penalty") return "penalties";
   return "sustained pressure";
 }
 

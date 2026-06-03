@@ -1,7 +1,7 @@
 import { chanceTypeBaseWeights } from "../../data/constants/formations";
 import { clamp } from "../../utils/math";
 import type { RandomSource } from "../../utils/random";
-import type { ChanceType } from "../types/match";
+import type { ChanceType, OpenPlayChanceType } from "../types/match";
 import type { Tactic } from "../types/tactics";
 import { focusProfiles, formationProfiles, riskProfiles } from "../tactics/tacticalProfiles";
 import type { PhaseStrengths } from "./calculatePhaseStrengths";
@@ -22,13 +22,15 @@ export function getTacticVolatility(tactic: Tactic): number {
   );
 }
 
-export function getChanceTypeWeights(attackingTactic: Tactic, defendingTactic?: Tactic): Record<ChanceType, number> {
-  const weights: Record<ChanceType, number> = { ...chanceTypeBaseWeights };
+export function getChanceTypeWeights(attackingTactic: Tactic, defendingTactic?: Tactic): Record<OpenPlayChanceType, number> {
+  const weights: Record<OpenPlayChanceType, number> = { ...chanceTypeBaseWeights };
   const profiles = [formationProfiles[attackingTactic.formation], focusProfiles[attackingTactic.focus]];
 
   for (const profile of profiles) {
     for (const [chanceType, modifier] of Object.entries(profile.chanceWeights)) {
-      weights[chanceType as ChanceType] += modifier ?? 0;
+      if (chanceType in weights) {
+        weights[chanceType as OpenPlayChanceType] += modifier ?? 0;
+      }
     }
   }
 
@@ -68,10 +70,10 @@ export function pickWeightedChanceType(
   attackingTactic: Tactic,
   defendingTactic: Tactic,
   rng: RandomSource
-): ChanceType {
+): OpenPlayChanceType {
   const entries = Object.entries(getChanceTypeWeights(attackingTactic, defendingTactic)).map(
     ([chanceType, weight]) => ({
-      chanceType: chanceType as ChanceType,
+      chanceType: chanceType as OpenPlayChanceType,
       weight
     })
   );

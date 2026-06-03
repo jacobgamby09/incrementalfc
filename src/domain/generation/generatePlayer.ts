@@ -9,44 +9,11 @@ import type {
 import { isGoalkeeperStats, goalkeeperStatKeys, outfieldStatKeys } from "../types/player";
 import type { StatRangeProfile } from "../types/league";
 import { createId, pickOne, randomInt, type RandomSource } from "../../utils/random";
-
-const firstNames = [
-  "Alfie",
-  "Ben",
-  "Callum",
-  "Dylan",
-  "Elliot",
-  "Finn",
-  "Harvey",
-  "Isaac",
-  "Jamie",
-  "Lewis",
-  "Mason",
-  "Noah",
-  "Owen",
-  "Rhys",
-  "Theo",
-  "Zac"
-] as const;
-
-const lastNames = [
-  "Barker",
-  "Cooper",
-  "Davies",
-  "Ellis",
-  "Foster",
-  "Grant",
-  "Hughes",
-  "Knight",
-  "Morris",
-  "Palmer",
-  "Reed",
-  "Spencer",
-  "Turner",
-  "Walsh",
-  "Webb",
-  "Young"
-] as const;
+import { getAgeCurveStageForAge } from "../player/playerPotential";
+import { contractProfile } from "../../data/constants/contractProfiles";
+import { playerContextProfile } from "../../data/constants/playerContextProfiles";
+import { calculateInitialMarketReputation } from "../player/playerContext";
+import { getNationalityProfile, pickNationalityForLeague } from "../../data/constants/worldProfiles";
 
 const roleByPosition: Record<PlayerPosition, PlayerRole> = {
   GK: "goalkeeper",
@@ -62,11 +29,14 @@ const roleByPosition: Record<PlayerPosition, PlayerRole> = {
   ST: "pressing_forward"
 };
 
-type GeneratePlayerOptions = {
+export type GeneratePlayerOptions = {
   clubId: string;
   position: PlayerPosition;
   statRange: StatRangeProfile;
   kitNumber?: number;
+  age?: number;
+  leagueLevel?: number;
+  nationality?: string;
   rng?: RandomSource;
 };
 
@@ -154,13 +124,6 @@ function createPotentialStats<T extends OutfieldStats | GoalkeeperStats>(
   return potential;
 }
 
-function getAgeCurveStage(age: number): Player["development"]["ageCurveStage"] {
-  if (age <= 20) return "youth";
-  if (age <= 24) return "developing";
-  if (age <= 30) return "prime";
-  return "declining";
-}
-
 function getAppearanceProfile(age: number, position: PlayerPosition): PlayerAppearanceProfile {
   if (age <= 20) return "youthful";
   if (age >= 31) return "veteran";
@@ -175,50 +138,64 @@ export function generatePlayer({
   position,
   statRange,
   kitNumber,
+  age: requestedAge,
+  leagueLevel = 1,
+  nationality: requestedNationality,
   rng = Math.random
 }: GeneratePlayerOptions): Player {
+  const age = requestedAge ?? randomInt(17, 34, rng);
   const currentStats =
     position === "GK" ? createGoalkeeperStats(statRange, rng) : createOutfieldStats(position, statRange, rng);
   const potentialStats = createPotentialStats(currentStats, statRange, rng);
   const currentAverage = averageStats(currentStats);
   const potentialAverage = averageStats(potentialStats);
-  const age = randomInt(17, 34, rng);
   const id = createId("player", rng);
-  const firstName = pickOne(firstNames, rng);
-  const lastName = pickOne(lastNames, rng);
+  const nationality = requestedNationality ?? pickNationalityForLeague(leagueLevel, rng);
+  const nationalityProfile = getNationalityProfile(nationality);
+  const firstName = pickOne(nationalityProfile.firstNames, rng);
+  const lastName = pickOne(nationalityProfile.lastNames, rng);
 
   return {
     id,
     firstName,
     lastName,
     age,
-    nationality: "Fictional",
+    nationality: nationalityProfile.nationality,
     clubId,
     primaryPosition: position,
     secondaryPositions: [],
     preferredRole: roleByPosition[position],
+    squadRole: age <= 20 ? "prospect" : "rotation",
+    marketReputation: calculateInitialMarketReputation(currentAverage, potentialAverage, age),
     currentStats,
     potentialStats,
     development: {
       trainingXp: 0,
       matchXp: 0,
       developmentRate: Number((0.8 + rng() * 0.7).toFixed(2)),
-      ageCurveStage: getAgeCurveStage(age),
+      ageCurveStage: getAgeCurveStageForAge(age),
+      unspentDevelopmentPoints: 0,
+      developmentPointProgress: 0,
       cappedStats: [],
       statProgress: {},
       lastMatchXpGained: 0,
       lastTrainingXpGained: 0,
+      lastDevelopmentPointsGained: 0,
       recentStatGrowth: [],
       recentDevelopmentNotes: []
     },
     contract: {
       wagePerWeek: Math.round(80 + currentAverage * 38 + potentialAverage * 16),
-      weeksRemaining: randomInt(40, 156, rng),
+      seasonsRemaining: randomInt(
+        contractProfile.initialContractSeasons.min,
+        contractProfile.initialContractSeasons.max,
+        rng
+      ),
       marketValue: Math.round(5_000 + currentAverage * 3_500 + potentialAverage * 2_000)
     },
     status: {
       fitness: 100,
-      morale: randomInt(55, 75, rng),
+      morale: randomInt(playerContextProfile.morale.initialMin, playerContextProfile.morale.initialMax, rng),
       form: randomInt(45, 65, rng),
       injuryWeeksRemaining: 0,
       suspendedMatchesRemaining: 0
@@ -235,6 +212,11 @@ export function generatePlayer({
       portraitSeed: `${clubId}_${id}_${firstName}_${lastName}_${position}`,
       appearanceProfile: getAppearanceProfile(age, position),
       kitNumber: kitNumber ?? randomInt(1, 99, rng)
+    },
+    transferIntent: {
+      isListed: false,
+      askingPrice: Math.round(5_000 + currentAverage * 3_500 + potentialAverage * 2_000),
+      interestLevel: 0
     }
   };
 }

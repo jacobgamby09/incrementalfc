@@ -75,7 +75,7 @@ export function aggregatePlayerMatchStats(match: Match, gameState: GameState): R
         primary.keyPasses += 1;
         primary.chanceInvolvements += 1;
       }
-      if (secondary) {
+      if (secondary && secondary.playerId !== primary?.playerId) {
         secondary.chanceInvolvements += 1;
       }
     }

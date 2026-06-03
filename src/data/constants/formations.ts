@@ -1,5 +1,5 @@
 import type { Formation, TacticalFocus } from "../../domain/types/tactics";
-import type { ChanceType } from "../../domain/types/match";
+import type { OpenPlayChanceType } from "../../domain/types/match";
 import type { PlayerPosition } from "../../domain/types/player";
 
 export const formations: Formation[] = [
@@ -146,7 +146,7 @@ export const formationPitchCoordinates: Record<Formation, PitchCoordinate[]> = {
   ]
 };
 
-export const chanceTypeBaseWeights: Record<ChanceType, number> = {
+export const chanceTypeBaseWeights: Record<OpenPlayChanceType, number> = {
   fast_breakaway: 1,
   wide_cross: 1,
   sustained_pressure: 1,

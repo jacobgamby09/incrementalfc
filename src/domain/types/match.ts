@@ -3,11 +3,30 @@ import type { PlayerPosition } from "./player";
 import type { PlayerStatGrowth } from "./player";
 import type { Lineup } from "./tactics";
 
-export type ChanceType =
+export type OpenPlayChanceType =
   | "fast_breakaway"
   | "wide_cross"
   | "sustained_pressure"
   | "rebound_big_chance";
+
+export type SetPieceChanceType =
+  | "corner"
+  | "indirect_free_kick"
+  | "direct_free_kick"
+  | "penalty";
+
+export type ChanceType = OpenPlayChanceType | SetPieceChanceType;
+
+export const setPieceChanceTypes: SetPieceChanceType[] = [
+  "corner",
+  "indirect_free_kick",
+  "direct_free_kick",
+  "penalty"
+];
+
+export function isSetPieceChanceType(chanceType: ChanceType): chanceType is SetPieceChanceType {
+  return setPieceChanceTypes.includes(chanceType as SetPieceChanceType);
+}
 
 export type MatchResult = {
   homeGoals: number;

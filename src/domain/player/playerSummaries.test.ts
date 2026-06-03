@@ -11,6 +11,7 @@ import {
   getMatchRatingRows,
   getPlayerPerformanceSummary,
   getPlayerRatingHistory,
+  getPlayerSeasonHistory,
   sortMatchRatingRows
 } from "./playerSummaries";
 
@@ -28,7 +29,11 @@ function teamStats(): MatchTeamStats {
       fast_breakaway: 0,
       wide_cross: 0,
       sustained_pressure: 0,
-      rebound_big_chance: 0
+      rebound_big_chance: 0,
+      corner: 0,
+      indirect_free_kick: 0,
+      direct_free_kick: 0,
+      penalty: 0
     }
   };
 }
@@ -147,12 +152,20 @@ describe("player summaries", () => {
   });
 
   it("calculates POT from potential stats rather than current stats", () => {
-    const player = generatePlayer({ clubId: "c", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9 });
+    const player = generatePlayer({ clubId: "c", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9, age: 20 });
     player.currentStats = { PAS: 1, SHO: 1, TAC: 1, CRO: 1, HEA: 1, ACC: 1, STA: 1, DRI: 1, POS: 1, TEC: 1, PHY: 1, MEN: 1 };
     player.potentialStats = { PAS: 10, SHO: 10, TAC: 10, CRO: 10, HEA: 10, ACC: 10, STA: 10, DRI: 10, POS: 10, TEC: 10, PHY: 10, MEN: 10 };
 
     expect(calculatePlayerOvr(player)).toBe(1);
     expect(calculatePlayerPot(player)).toBe(10);
+  });
+
+  it("preserves real POT for players aged 30 or older even when normal development has stopped", () => {
+    const player = generatePlayer({ clubId: "c", position: "ST", statRange: lowestLeagueStatRange, kitNumber: 9, age: 30 });
+    player.currentStats = { PAS: 4, SHO: 6, TAC: 4, CRO: 4, HEA: 4, ACC: 6, STA: 5, DRI: 5, POS: 6, TEC: 6, PHY: 5, MEN: 5 };
+    player.potentialStats = { PAS: 10, SHO: 12, TAC: 10, CRO: 10, HEA: 10, ACC: 12, STA: 10, DRI: 10, POS: 12, TEC: 12, PHY: 10, MEN: 10 };
+
+    expect(calculatePlayerPot(player)).toBeGreaterThan(calculatePlayerOvr(player));
   });
 
   it("changes OVR when new role-relevant stats change", () => {
@@ -192,6 +205,41 @@ describe("player summaries", () => {
     expect(summary.apps).toBe(0);
     expect(summary.formLastFive).toEqual([]);
     expect(summary.display.avgRating).toBe("-");
+  });
+
+  it("builds compact player history across completed seasons", () => {
+    const baseState = generateGameState();
+    const playerId = baseState.clubs[baseState.playerClubId].squadPlayerIds[0];
+    const seasonOneState = addRatedMatches(baseState, playerId, [6.8, 7.2]);
+    const seasonOne = seasonOneState.seasons[seasonOneState.currentSeasonId];
+    const seasonTwoId = "season_history_2";
+    const gameState = {
+      ...seasonOneState,
+      currentSeasonId: seasonTwoId,
+      seasons: {
+        ...seasonOneState.seasons,
+        [seasonTwoId]: {
+          ...seasonOne,
+          id: seasonTwoId,
+          seasonNumber: 2,
+          fixtures: [],
+          table: seasonOne.table.map((entry) => ({ ...entry })),
+          currentMatchday: 1,
+          status: "active" as const
+        }
+      }
+    };
+
+    const history = getPlayerSeasonHistory(gameState, playerId);
+
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      seasonNumber: 1,
+      apps: 2,
+      goals: 1,
+      assists: 0,
+      avgRating: 7
+    });
   });
 
   it("builds club-aware match rating rows", () => {

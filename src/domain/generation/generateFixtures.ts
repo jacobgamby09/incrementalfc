@@ -11,10 +11,14 @@ export function generateFixtures(clubIds: string[], seasonId: string): Fixture[]
 
   for (let round = 0; round < rounds; round += 1) {
     for (let i = 0; i < teams.length / 2; i += 1) {
-      const left = teams[i];
-      const right = teams[teams.length - 1 - i];
-      const homeClubId = (round + i) % 2 === 0 ? left : right;
-      const awayClubId = homeClubId === left ? right : left;
+      let homeClubId = teams[i];
+      let awayClubId = teams[teams.length - 1 - i];
+
+      // Alternate the fixed team separately from the rotating pairs. This keeps
+      // the round robin intact without creating long home or away streaks.
+      if (i === 0 ? round % 2 === 1 : round % 2 === 0) {
+        [homeClubId, awayClubId] = [awayClubId, homeClubId];
+      }
 
       firstHalf.push({
         id: `fixture_${seasonId}_${round + 1}_${i + 1}`,

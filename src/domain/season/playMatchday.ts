@@ -10,7 +10,12 @@ import { applyMatchRewards } from "../rewards/applyMatchRewards";
 import { runTraining } from "../development/playerDevelopment";
 import { getTacticKey } from "../tactics/tacticFamiliarity";
 import { updateLeagueTable } from "./updateLeagueTable";
+import { applyMatchdayFitnessUpdates } from "../fitness/playerFitness";
 import type { RandomSource } from "../../utils/random";
+import { processWeeklyFinances } from "../economy/clubFinance";
+import { advanceFacilityConstruction } from "../facilities/facilityUpgrades";
+import { advanceYouthAcademy } from "../academy/youthAcademy";
+import { applyMatchdayPlayerContextUpdates } from "../player/playerContext";
 
 type PlayMatchdayOptions = {
   gameState: GameState;
@@ -25,7 +30,7 @@ type PlayMatchdayResult = {
   playerMatchId: string;
 };
 
-function upsertTactic(club: Club, tactic: Tactic): Club {
+function upsertTactic(club: Club, tactic: Tactic, lineup?: Lineup): Club {
   const savedTactics = club.tactics.savedTactics.some((savedTactic) => savedTactic.id === tactic.id)
     ? club.tactics.savedTactics.map((savedTactic) => (savedTactic.id === tactic.id ? tactic : savedTactic))
     : [...club.tactics.savedTactics, tactic];
@@ -39,7 +44,8 @@ function upsertTactic(club: Club, tactic: Tactic): Club {
       familiarityByTacticId: {
         ...club.tactics.familiarityByTacticId,
         [getTacticKey(tactic)]: club.tactics.familiarityByTacticId[getTacticKey(tactic)] ?? club.tactics.familiarityByTacticId[tactic.id] ?? 50
-      }
+      },
+      activeLineup: lineup || club.tactics.activeLineup
     }
   };
 }
@@ -200,7 +206,7 @@ export function playMatchday({
     ...gameState,
     clubs: {
       ...gameState.clubs,
-      [gameState.playerClubId]: upsertTactic(gameState.clubs[gameState.playerClubId], playerTactic)
+      [gameState.playerClubId]: upsertTactic(gameState.clubs[gameState.playerClubId], playerTactic, playerLineup)
     }
   };
   const playerMatch = simulateFixture(nextGameState, selectedFixture, playerLineup, playerTactic, rng);
@@ -212,10 +218,15 @@ export function playMatchday({
     (fixture) => fixture.matchday === selectedFixture.matchday && fixture.status === "scheduled"
   );
 
+  const matchesThisMatchday: Match[] = [playerMatch];
   for (const fixture of remainingMatchdayFixtures) {
     const match = simulateFixture(nextGameState, fixture, undefined, undefined, rng);
     nextGameState = applyMatchToSeason(nextGameState, nextGameState.seasons[nextGameState.currentSeasonId], match);
+    matchesThisMatchday.push(match);
   }
+
+  nextGameState = applyMatchdayFitnessUpdates(nextGameState, matchesThisMatchday, playerTactic);
+  nextGameState = applyMatchdayPlayerContextUpdates(nextGameState, matchesThisMatchday);
 
   const trainingClub = nextGameState.clubs[nextGameState.playerClubId];
   const trainingResult = runTraining(nextGameState, trainingClub);
@@ -251,10 +262,73 @@ export function playMatchday({
     }
   };
 
+  nextGameState = processWeeklyFinances(nextGameState, selectedFixture, playerMatch.rewards.money);
+  nextGameState = advanceFacilityConstruction(nextGameState, 1, [nextGameState.playerClubId]);
+  nextGameState = advanceYouthAcademy(nextGameState, 1, rng);
   nextGameState = maybeAdvanceMatchday(nextGameState);
+  nextGameState = updateAITacticsForNextMatch(nextGameState, rng);
 
   return {
     gameState: nextGameState,
     playerMatchId: playerMatch.id
+  };
+}
+
+export function adjustAITactic(club: Club, rng: RandomSource): Tactic {
+  const baseTactic = club.tactics.savedTactics[0] ?? club.tactics.activeTactic;
+  const activeTactic = { ...baseTactic };
+  const form = club.seasonStats.formLastFive;
+
+  const recentPoints = form.reduce((sum, res) => sum + (res === "W" ? 3 : res === "D" ? 1 : 0), 0);
+  const playedRecent = form.length;
+  const isBadForm = playedRecent >= 3 && (
+    (form[0] === "L" && form[1] === "L" && form[2] === "L") ||
+    (recentPoints / playedRecent <= 0.75)
+  );
+
+  const isGoodForm = playedRecent >= 3 && (
+    (form[0] === "W" && form[1] === "W" && form[2] === "W") ||
+    (recentPoints >= 9)
+  );
+
+  if (isBadForm) {
+    if (rng() < 0.65) {
+      activeTactic.focus = "defensive_shape";
+      activeTactic.riskLevel = "conservative";
+      if (["4-3-3", "3-4-3", "3-4-2-1"].includes(activeTactic.formation)) {
+        activeTactic.formation = "5-4-1";
+      }
+    }
+  } else if (isGoodForm && club.ecosystem?.archetype === "ambitious") {
+    if (rng() < 0.50) {
+      activeTactic.riskLevel = "aggressive";
+      if (activeTactic.focus === "defensive_shape") {
+        activeTactic.focus = "sustained_pressure";
+      }
+    }
+  }
+
+  return activeTactic;
+}
+
+function updateAITacticsForNextMatch(gameState: GameState, rng: RandomSource): GameState {
+  const nextClubs = { ...gameState.clubs };
+
+  for (const clubId of Object.keys(nextClubs)) {
+    if (clubId === gameState.playerClubId) continue;
+    const club = nextClubs[clubId];
+    const adjustedTactic = adjustAITactic(club, rng);
+    nextClubs[clubId] = {
+      ...club,
+      tactics: {
+        ...club.tactics,
+        activeTactic: adjustedTactic
+      }
+    };
+  }
+
+  return {
+    ...gameState,
+    clubs: nextClubs
   };
 }

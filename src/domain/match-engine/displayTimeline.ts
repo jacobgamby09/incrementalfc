@@ -37,7 +37,11 @@ const chanceTypeCopy: Record<ChanceType, string> = {
   fast_breakaway: "a fast breakaway",
   wide_cross: "a wide cross",
   sustained_pressure: "sustained pressure",
-  rebound_big_chance: "a rebound chance"
+  rebound_big_chance: "a rebound chance",
+  corner: "a corner",
+  indirect_free_kick: "an indirect free kick",
+  direct_free_kick: "a direct free kick",
+  penalty: "a penalty"
 };
 
 function playerName(playerId: string | undefined, options: DisplayTimelineOptions): string {

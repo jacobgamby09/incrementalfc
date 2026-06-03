@@ -4,15 +4,17 @@ This document describes the mathematical and logical foundation for the game's m
 
 The match engine should not simulate every pass, run, and positional movement like a full football manager game. Instead, it should convert team strength, player profiles, tactics, and match dynamics into a small number of readable events that still feel like football.
 
+Sections marked `[Planned]` describe intended extensions rather than active simulation logic. The current engine already includes contextual duels, readiness and fatigue, goalkeeper pressure, rebounds, creator/finisher attribution, and contextual set pieces.
+
 ---
 
 ## 1. Data Foundation (Inputs)
 
 Before a match is simulated, the engine loads the following data for both teams.
 
-### Outfield Players (9 Stats, Scale 0-99)
+### Outfield Players (12 Stats, Scale 0-99)
 
-**Skills:** `Passing (PAS)`, `Shooting (SHO)`, `Tackling (TAC)`, `Crossing (CRO)`, `Heading (HEA)`, `Acceleration (ACC)`.
+**Skills:** `Passing (PAS)`, `Shooting (SHO)`, `Tackling (TAC)`, `Crossing (CRO)`, `Heading (HEA)`, `Acceleration (ACC)`, `Stamina (STA)`, `Dribbling (DRI)`, `Positioning (POS)`.
 
 **Core attributes:** `Technique (TEC)` (general quality/multiplier), `Physicality (PHY)` (duel strength/stamina), `Mentality (MEN)` (performance under pressure).
 
@@ -48,9 +50,9 @@ Recommended model:
 - a small advantage in close duel rolls
 - optionally, a slightly lower card risk in 50/50 situations
 
-**Weather (Wildcard):** Weather affects match style. Example: heavy rain can apply `-15% TEC`, `+10% PHY`, lower passing quality, and increase loose-ball/rebound situations.
+**Weather (Wildcard) [Planned]:** Weather can later affect match style. Example: heavy rain can apply `-15% TEC`, `+10% PHY`, lower passing quality, and increase loose-ball/rebound situations.
 
-**Staff (Upgrades):** Passive, permanent bonuses to specific stat categories. These bonuses should stay small enough that they do not overpower player quality or tactical choices.
+**Staff (Upgrades) [Planned]:** Staff can later provide small bonuses to specific stat categories. These bonuses should stay small enough that they do not overpower player quality or tactical choices.
 
 ---
 
@@ -110,14 +112,14 @@ Instead of rolling only 3-9 direct chances, the match should first roll a number
 Total events = Random Integer between 20 and 40
 ```
 
-Event volume is adjusted by match style, formations, weather, red cards, and both teams' attacking/defensive balance.
+Event volume is currently adjusted by match style, formations, and both teams' attacking/defensive balance. Weather and red-card effects are planned extensions.
 
 Examples:
 
 - Two defensive teams: fewer events.
 - Two aggressive teams: more events.
-- Red card: more events for the opponent.
-- Bad weather: fewer technical chances, more loose balls.
+- Planned red-card effect: more events for the opponent.
+- Planned weather effect: fewer technical chances, more loose balls.
 
 ### Step 2: Event Distribution
 
@@ -154,6 +156,8 @@ This layer makes the match less binary than "won duel = shot".
 
 When an event becomes dangerous, the engine chooses a chance type. The choice should be weighted by the team's formation, tactics, and player profiles.
 
+Chance creation and finishing are separate contributions. A winger creating a cross is evaluated primarily through `CRO`, `DRI`, `ACC`, and `TEC`, while the player attacking the delivery is evaluated through `HEA`, `POS`, `PHY`, `SHO`, and `MEN`. The engine also weights positional involvement: centre-backs rarely finish open-play attacks, while strikers, attacking midfielders, and wide forwards appear in realistic attacking contexts.
+
 | Chance type | Attacking stats | Defensive counter-stats | Typical base xG |
 | --- | --- | --- | --- |
 | Fast breakaway | `ACC` + `TEC` + `SHO` | `ACC` + `TAC` + defensive `MEN` | `0.20 - 0.35` |
@@ -163,7 +167,25 @@ When an event becomes dangerous, the engine chooses a chance type. The choice sh
 
 Base xG is not the final goal probability. It is the starting point, then adjusted by player quality, goalkeeper quality, mentality, and match dynamics.
 
-### Step 5: Shot Quality and Goal Probability
+### Step 5: Set Pieces
+
+Set pieces are generated as a separate family of dangerous events. They do not sit inside the ordinary open-play tactic weight table.
+
+- corners can follow saved or deflected shots
+- free kicks can follow failed attacking events and defensive fouls
+- penalties are a rare outcome of defensive mistakes in dangerous areas
+- aggressive defending slightly increases foul and penalty exposure
+
+| Set piece type | Delivery / taker stats | Finisher stats | Defensive / goalkeeper stats | Typical base xG |
+| --- | --- | --- | --- | --- |
+| Corner | `CRO` + `TEC` + `MEN` | `HEA` + `PHY` + `POS` + `MEN` | defensive `HEA` + `PHY` + `POS`, keeper `HAN` + `MEN` | `0.06 - 0.13` |
+| Indirect free kick | `CRO` + `PAS` + `TEC` | `HEA` + `POS` + `PHY` | defensive `HEA` + `POS` + `PHY`, keeper `HAN` + `MEN` | `0.05 - 0.12` |
+| Direct free kick | `SHO` + `TEC` + `MEN` | same player | keeper `REF` + `MEN` | `0.06 - 0.15` |
+| Penalty | `SHO` + `MEN` + a little `TEC` | same player | keeper `REF` + `MEN` | `0.72 - 0.82` |
+
+Position weighting is deliberately contextual. Centre-backs are low-probability finishers in open play, but high-probability aerial targets at corners and indirect free kicks. This preserves believable defender goals without allowing an unusually technical centre-back to become the default open-play scorer.
+
+### Step 6: Shot Quality and Goal Probability
 
 The previous direct formula:
 
@@ -197,7 +219,7 @@ Normal chance with base xG 0.18 becomes roughly a 19% goal chance
 
 If a larger gap between elite and weak players is desired, `Skill Modifier` can be widened, but it should still be constrained by base xG so ordinary shots do not become 50% goal chances.
 
-### Step 6: Player Contribution Tracking
+### Step 7: Player Contribution Tracking
 
 To support realistic player ratings and later performance-based XP, the match engine should track which players contributed to important events.
 
@@ -234,7 +256,7 @@ Error:
 
 This contribution layer should stay lightweight. The goal is not to simulate every touch, but to make player ratings and match reports feel grounded in what happened.
 
-### Step 7: Player Match Ratings
+### Step 8: Player Match Ratings
 
 Player ratings should be derived from match contributions after the match is simulated.
 
@@ -373,11 +395,11 @@ Goalkeeper effectiveness penalty = 20% - 35%
 
 This makes the situation extremely dangerous, but not an automatic goal.
 
-### C. Red Cards
+### C. Red Cards [Planned]
 
-During the match there is a very small base probability of a red card, either directly or through two yellow cards.
+Cards are not yet simulated by the current match engine. When implemented, there should be a very small base probability of a red card, either directly or through two yellow cards.
 
-Yellow cards can be cosmetic in the first version, but later they can increase red card risk or make a player less aggressive in duels.
+Yellow cards can initially be cosmetic, but later they can increase red card risk or make a player less aggressive in duels.
 
 A red card should affect the team's structure depending on where it happens.
 
@@ -405,6 +427,16 @@ Possible effects:
 
 This makes mentality valuable without letting it take over the entire model.
 
+### E. Player Readiness & Fatigue
+
+Pre-match fitness (represented in the UI as "Readiness") directly influences in-match attributes and late-match performance:
+1. **Starting Fitness Modifier**: Applies a mild penalty to team phase contributions and goalkeeper strength based on the player's readiness score before kick-off:
+   - `>= 85`: `1.0` (no penalty)
+   - `70-84`: `0.98` (tiny penalty)
+   - `55-69`: `0.94` (visible penalty)
+   - `< 55`: `0.88` (meaningful penalty)
+2. **Match-Local Fatigue Penalty**: Starting fitness affects late-match fatigue decline. A starting fitness penalty `startingFitnessPenalty = clamp((100 - fitness) / 100 * 0.10, 0, 0.10)` is added to late-match fatigue loss, accelerating performance decline after the 55th minute and allowing fatigue loss to increase up to `0.22` (capping the final fatigue modifier at `0.78` instead of `0.82` for fully fit players).
+
 ---
 
 ## 5. UI Presentation (10 Seconds of Tension)
@@ -420,7 +452,8 @@ Example flow:
 - minute counter from `0'` to `90'`
 - grouped highlights distributed across the timeline
 - dangerous chances get stronger emphasis than normal events
-- goals, red cards, and big saves appear in the live feed
+- goals and big chances appear in the live feed
+- cards and injuries can join the feed when those systems are implemented
 - rebound/big chance situations feel like dramatic double moments
 
 ### Raw Events vs Display Events
@@ -467,22 +500,16 @@ Preferred display event:
 26' GOAL - Finn Barker scores from sustained pressure. xG 0.14
 ```
 
-The detailed raw event log can still be available as a collapsed debug/advanced section, but the default match playback should read like football commentary rather than engine output.
+The match simulation interface separates these events to create a modern broadcast dashboard experience:
+1. **Live Match Stats**: Displays real-time updating comparison (tug-of-war) stats for both teams including Possession, Shots, Shots on Target, Expected Goals (xG), Saves, and Defensive Stops.
+2. **Key Moments**: A high-level highlight feed showing goals (with assister context) and big chances. Cards and injuries can join this feed when those systems are implemented.
+3. **Detailed Event Log**: A collapsible section containing the full timeline of grouped commentary events for debuggers and detail lovers, closed by default.
 
-The timeline should be able to create a match story:
-
-```text
-The opponent goes 2-0 up.
-Your team gets a red card.
-Your goalkeeper keeps you in the match.
-You score from a late rebound and finish 2-2.
-```
-
-The drama should come from the calculated events, not from the UI rewriting the result. The UI should present the simulation dramatically, but never change the outcome after the engine has calculated it.
+The UI presents this simulation dramatically, updating stats and moments minute-by-minute, but never alters the calculated match outcomes.
 
 ### Player Identity in Match UI
 
-Player names should be clickable wherever practical. Match reports and rating tables should clearly show which club each player belongs to, especially when top performers include players from both teams.
+Player names are clickable in both the Key Moments list and the Detailed Event Log. Clicking a player's name opens their detailed match stats sheet.
 
 ---
 
@@ -493,9 +520,9 @@ Player names should be clickable wherever practical. Match reports and rating ta
 Flat bonuses to every stat are easy, but they can quickly feel artificial. Bonuses should usually target a specific part of the match engine:
 
 - home advantage affects control and mentality
-- weather affects technique/physicality and chance types
+- planned weather can affect technique/physicality and chance types
 - formation affects event types and structural strengths
-- staff affects specific stat categories
+- planned staff upgrades can affect specific stat categories
 
 ### Separate Volume and Quality
 
@@ -547,7 +574,8 @@ A good first version of the match engine can stay simple:
 8. Roll goal outcome.
 9. Track player contributions for shots, goals, saves, chance creation, defensive actions, and errors.
 10. Calculate player match ratings.
-11. Handle rebounds, red cards, and goalkeeper pressure.
+11. Handle rebounds, contextual corners, free kicks, penalties, and goalkeeper pressure.
 12. Generate grouped display timeline events for the UI while preserving raw events for ratings/stats/debugging.
+13. Add cards, injuries, weather, and staff effects as later extensions.
 
 This version should create a believable football feel while staying small enough for an incremental game.

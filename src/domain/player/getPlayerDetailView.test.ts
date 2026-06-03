@@ -21,6 +21,11 @@ describe("player detail view", () => {
     expect(detail.primaryPosition).toBe("CM");
     expect(detail.wagePerWeek).toBe(player.contract.wagePerWeek);
     expect(detail.marketValue).toBe(player.contract.marketValue);
+    expect(detail.squadRole).toBe(player.squadRole);
+    expect(detail.morale).toBe(player.status.morale);
+    expect(detail.marketReputation).toBe(player.marketReputation);
+    expect(detail.tacticalFits).toHaveLength(3);
+    expect(detail.tacticalFits[0].score).toBeGreaterThanOrEqual(detail.tacticalFits[1].score);
     expect(detail.ovr).toBeGreaterThan(0);
     expect(detail.estimatedPot).toBeGreaterThan(0);
     expect(detail.currentStats.length).toBeGreaterThan(0);

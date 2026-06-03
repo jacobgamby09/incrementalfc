@@ -9,8 +9,6 @@ import {
   type MatchRatingSortColumn,
   type MatchRatingRow
 } from "../../domain/player/playerSummaries";
-import { getMatchDevelopmentSummary } from "../../domain/development/developmentPresentation";
-import { formatCurrency, formatNumber } from "../../utils/format";
 import { PlayerDetailSheet } from "../components/player/PlayerDetailSheet";
 import { PlayerNameButton } from "../components/player/PlayerNameButton";
 import { LeagueTable } from "../components/tables/LeagueTable";
@@ -18,7 +16,8 @@ import { LeagueTable } from "../components/tables/LeagueTable";
 type MatchReportScreenProps = {
   gameState: GameState;
   matchId: string;
-  onBackToDashboard: () => void;
+  onContinueToRewards: () => void;
+  buttonLabel?: string;
 };
 
 function statRows(stats: MatchTeamStats): Array<[string, string | number]> {
@@ -43,7 +42,8 @@ function ratingRowClass(row: MatchRatingRow): string {
 export function MatchReportScreen({
   gameState,
   matchId,
-  onBackToDashboard
+  onContinueToRewards,
+  buttonLabel
 }: MatchReportScreenProps): JSX.Element {
   const match = gameState.matches[matchId];
   const [ratingFilter, setRatingFilter] = useState<MatchRatingFilter>("all");
@@ -60,7 +60,6 @@ export function MatchReportScreen({
   const topPerformers = allRatingRows.slice(0, 3);
   const underperformers = allRatingRows.filter((row) => row.rating < 6).slice(0, 3);
   const selectedPlayer = selectedPlayerId ? gameState.players[selectedPlayerId] : undefined;
-  const developmentSummary = getMatchDevelopmentSummary(gameState, match);
 
   function openPlayer(row: MatchRatingRow): void {
     setSelectedPlayerId(row.playerId);
@@ -97,15 +96,16 @@ export function MatchReportScreen({
           </div>
           <button
             type="button"
-            onClick={onBackToDashboard}
-            className="h-10 rounded-md bg-stone-950 px-4 text-sm font-semibold text-white transition hover:bg-pitch-700"
+            onClick={onContinueToRewards}
+            className="flex h-10 items-center justify-center gap-1.5 rounded-md bg-pitch-700 px-5 text-sm font-semibold text-white transition hover:bg-pitch-900 shadow-sm"
           >
-            Back to Dashboard
+            <span>{buttonLabel ?? "Continue to Rewards"}</span>
+            <span>→</span>
           </button>
         </div>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-3">
+      <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-md border border-stone-300 bg-white p-4">
           <h3 className="mb-3 text-lg font-semibold">Your Stats</h3>
           <div className="space-y-2 text-sm">
@@ -128,114 +128,17 @@ export function MatchReportScreen({
             ))}
           </div>
         </div>
-        <div className="rounded-md border border-stone-300 bg-white p-4">
-          <h3 className="mb-3 text-lg font-semibold">Rewards</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between gap-3">
-              <span className="text-stone-600">Money</span>
-              <span className="font-medium">{formatCurrency(match.rewards.money)}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-stone-600">Fans</span>
-              <span className="font-medium">{formatNumber(match.rewards.fans)}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-stone-600">Reputation</span>
-              <span className="font-medium">+{match.rewards.reputation}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-stone-600">Player XP</span>
-              <span className="font-medium">{Object.keys(match.rewards.playerXp).length} players</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-stone-600">Training XP</span>
-              <span className="font-medium">{formatNumber(developmentSummary.totalTrainingXp)}</span>
-            </div>
-            <div className="flex justify-between gap-3">
-              <span className="text-stone-600">Tactic Familiarity</span>
-              <span className="font-medium">+{developmentSummary.tacticalFamiliarityGained}%</span>
-            </div>
-          </div>
-        </div>
       </section>
 
       <section className="rounded-md border border-stone-300 bg-white p-4">
-        <h3 className="mb-3 text-lg font-semibold">Development</h3>
-        <div className="grid gap-3 text-sm sm:grid-cols-3">
-          <div className="rounded border border-stone-200 bg-stone-50 px-3 py-2">
-            <span className="text-stone-600">Total match XP</span>
-            <span className="float-right font-bold tabular-nums">{formatNumber(developmentSummary.totalMatchXp)}</span>
-          </div>
-          <div className="rounded border border-stone-200 bg-stone-50 px-3 py-2">
-            <span className="text-stone-600">Total training XP</span>
-            <span className="float-right font-bold tabular-nums">{formatNumber(developmentSummary.totalTrainingXp)}</span>
-          </div>
-          <div className="rounded border border-stone-200 bg-stone-50 px-3 py-2">
-            <span className="text-stone-600">Tactical familiarity</span>
-            <span className="float-right font-bold tabular-nums">+{developmentSummary.tacticalFamiliarityGained}%</span>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-4 xl:grid-cols-2">
-          <div>
-            <h4 className="text-sm font-semibold uppercase text-stone-500">Top XP Gainers</h4>
-            <div className="mt-2 space-y-2 text-sm">
-              {developmentSummary.topXpGainers.slice(0, 4).map((entry) => {
-                const player = gameState.players[entry.playerId];
-                return (
-                <div key={entry.playerId} className="rounded border border-stone-200 bg-stone-50 px-3 py-2" title={entry.reasonText}>
-                  <div className="flex justify-between gap-3">
-                    {player ? (
-                      <PlayerNameButton
-                        player={player}
-                        isOwnClub
-                        onClick={() => openPlayerId(entry.playerId)}
-                      />
-                    ) : (
-                      <span className="font-medium">{entry.playerName}</span>
-                    )}
-                    <span className="flex items-center gap-2">
-                      {entry.statIncreaseBadges.map((badge) => (
-                        <span key={badge} className="rounded bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">
-                          {badge}
-                        </span>
-                      ))}
-                      <span className="font-bold tabular-nums">+{entry.totalXp} XP</span>
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded bg-stone-200">
-                    <div className="h-full rounded bg-emerald-500" style={{ width: `${Math.min(100, entry.progressPercent)}%` }} />
-                  </div>
-                </div>
-                );
-              })}
+        <h3 className="mb-3 text-lg font-semibold">Your Chance Breakdown</h3>
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          {Object.entries(playerStats.chanceTypeBreakdown).map(([chanceType, count]) => (
+            <div key={chanceType} className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-sm">
+              <span className="capitalize text-stone-600">{labelChanceType(chanceType)}</span>
+              <span className="float-right font-semibold tabular-nums">{count}</span>
             </div>
-          </div>
-          <div>
-            <h4 className="text-sm font-semibold uppercase text-stone-500">Stat Increases</h4>
-            <div className="mt-2 space-y-2 text-sm">
-              {developmentSummary.noGrowthMessage && (
-                <div className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-stone-600">
-                  {developmentSummary.noGrowthMessage}
-                </div>
-              )}
-              {developmentSummary.improvedPlayers.map((summary) => (
-                <div key={summary.playerId} className="rounded border border-pitch-200 bg-pitch-50 px-3 py-2">
-                  {gameState.players[summary.playerId] ? (
-                    <PlayerNameButton
-                      player={gameState.players[summary.playerId]}
-                      isOwnClub
-                      onClick={() => openPlayerId(summary.playerId)}
-                    />
-                  ) : (
-                    <span className="font-semibold">{summary.playerName}</span>
-                  )}
-                  <span className="ml-2 text-stone-700">
-                    {summary.statGrowth.map((growth) => `+${growth.to - growth.from} ${growth.statKey}`).join(", ")}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 
@@ -394,18 +297,6 @@ export function MatchReportScreen({
               })}
             </tbody>
           </table>
-        </div>
-      </section>
-
-      <section className="rounded-md border border-stone-300 bg-white p-4">
-        <h3 className="mb-3 text-lg font-semibold">Your Chance Breakdown</h3>
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-          {Object.entries(playerStats.chanceTypeBreakdown).map(([chanceType, count]) => (
-            <div key={chanceType} className="rounded border border-stone-200 bg-stone-50 px-3 py-2 text-sm">
-              <span className="capitalize text-stone-600">{labelChanceType(chanceType)}</span>
-              <span className="float-right font-semibold tabular-nums">{count}</span>
-            </div>
-          ))}
         </div>
       </section>
 

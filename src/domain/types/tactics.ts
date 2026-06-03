@@ -43,6 +43,7 @@ export type ClubTactics = {
   activeTactic: Tactic;
   savedTactics: Tactic[];
   familiarityByTacticId: Record<string, number>;
+  activeLineup?: Lineup;
 };
 
 export type LineupSlot = {

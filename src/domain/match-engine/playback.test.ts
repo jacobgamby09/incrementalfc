@@ -36,7 +36,11 @@ function createPlaybackMatch(): Match {
           fast_breakaway: 0,
           wide_cross: 0,
           sustained_pressure: 0,
-          rebound_big_chance: 0
+          rebound_big_chance: 0,
+          corner: 0,
+          indirect_free_kick: 0,
+          direct_free_kick: 0,
+          penalty: 0
         }
       },
       awayStats: {
@@ -52,7 +56,11 @@ function createPlaybackMatch(): Match {
           fast_breakaway: 0,
           wide_cross: 0,
           sustained_pressure: 0,
-          rebound_big_chance: 0
+          rebound_big_chance: 0,
+          corner: 0,
+          indirect_free_kick: 0,
+          direct_free_kick: 0,
+          penalty: 0
         }
       },
       keyProblems: [],

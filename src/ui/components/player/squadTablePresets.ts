@@ -10,7 +10,7 @@ export const squadTablePresets: SquadTablePreset[] = [
   {
     id: "overview",
     label: "Overview",
-    columns: ["Player", "Age", "Position", "OVR", "Est. POT", "Form", "Avg Rating", "Wage", "Value"]
+    columns: ["Player", "Age", "Position", "Squad Role", "Best Focus", "OVR", "POT", "Dev Points", "Readiness", "Form", "Avg Rating"]
   },
   {
     id: "attributes",
@@ -25,11 +25,11 @@ export const squadTablePresets: SquadTablePreset[] = [
   {
     id: "contract",
     label: "Contract",
-    columns: ["Player", "Age", "Position", "Wage", "Value", "Contract Remaining"]
+    columns: ["Player", "Age", "Position", "Squad Role", "Morale", "Market Rep", "Wage", "Value", "Contract Remaining"]
   },
   {
     id: "development",
     label: "Development",
-    columns: ["Player", "Age", "Position", "OVR", "Est. POT", "Match XP", "Training XP", "Last XP", "Recent Growth", "Cap Status"]
+    columns: ["Player", "Age", "Position", "OVR", "POT", "Dev Points", "Match XP", "Training XP", "Last XP", "Recent Growth", "Development Status"]
   }
 ];

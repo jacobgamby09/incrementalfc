@@ -5,6 +5,7 @@ import { isGoalkeeperStats, type OutfieldStats, type Player, type PlayerPosition
 import type { Lineup, LineupSlot, Tactic } from "../types/tactics";
 import { calculatePositionFit, getPositionFitModifier, type PositionFitLevel } from "./positionFit";
 import { getOutfieldStatValue } from "../player/statAccess";
+import { getPlayerFitness, getLineupSelectionPenalty } from "../fitness/playerFitness";
 
 export type LineupValidationResult = {
   valid: boolean;
@@ -37,16 +38,18 @@ function outfieldScore(stats: OutfieldStats, slotPosition: PlayerPosition): numb
 export function scorePlayerForPosition(player: Player, slotPosition: PlayerPosition): number {
   const stats = player.currentStats;
   const fit = calculatePositionFit(player, slotPosition);
+  const fitness = getPlayerFitness(player);
+  const penalty = getLineupSelectionPenalty(fitness);
 
   if (isGoalkeeperStats(stats)) {
-    return slotPosition === "GK" ? average([stats.REF, stats.HAN, stats.MEN]) : -100;
+    return slotPosition === "GK" ? average([stats.REF, stats.HAN, stats.MEN]) + penalty : -100;
   }
 
   if (slotPosition === "GK") {
     return -100;
   }
 
-  return outfieldScore(stats, slotPosition) * getPositionFitModifier(player, slotPosition) + (fit.level === "natural" ? 2 : 0);
+  return outfieldScore(stats, slotPosition) * getPositionFitModifier(player, slotPosition) + (fit.level === "natural" ? 2 : 0) + penalty;
 }
 
 export function autoSelectLineup(club: Club, gameState: GameState, tactic: Tactic): Lineup {

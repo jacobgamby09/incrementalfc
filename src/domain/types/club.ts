@@ -1,5 +1,7 @@
 import type { EconomyState, FacilitySet } from "./economy";
 import type { ClubTactics } from "./tactics";
+import type { Player } from "./player";
+import type { ClubTraining } from "./training";
 
 export type MatchResultCode = "W" | "D" | "L";
 
@@ -23,16 +25,12 @@ export type ClubHistory = {
 };
 
 export type YouthAcademy = {
-  level: number;
-  weeklyUpkeep: number;
   prospectGenerationProgress: number;
-  prospectGenerationRate: number;
+  pendingProspect: Player | null;
   youthCoachBonus: number;
 };
 
 export type ScoutingDepartment = {
-  level: number;
-  weeklyUpkeep: number;
   reportAccuracy: number;
 };
 
@@ -49,6 +47,17 @@ export type ClubVisualIdentity = {
   hubTheme: ClubHubTheme;
 };
 
+export type ClubArchetype = "ambitious" | "stable" | "youth_development" | "veteran" | "financially_cautious";
+
+export type ClubEcosystemState = {
+  archetype: ClubArchetype;
+  financialPressure: number; // 0 to 100
+  squadNeedProfile: {
+    positions: string[];
+    minOvr: number;
+  };
+};
+
 export type Club = {
   id: string;
   name: string;
@@ -62,8 +71,10 @@ export type Club = {
   economy: EconomyState;
   facilities: FacilitySet;
   tactics: ClubTactics;
+  training: ClubTraining;
   academy: YouthAcademy;
   scouting: ScoutingDepartment;
   seasonStats: ClubSeasonStats;
   history: ClubHistory;
+  ecosystem: ClubEcosystemState;
 };

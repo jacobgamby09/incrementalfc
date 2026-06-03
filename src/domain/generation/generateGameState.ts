@@ -6,65 +6,54 @@ import { createId, type RandomSource } from "../../utils/random";
 import { generateClub } from "./generateClub";
 import { generateFixtures } from "./generateFixtures";
 import { createEmptyTable, generateLeague } from "./generateLeague";
-
-const clubNames = [
-  ["Incremental FC", "IFC"],
-  ["Ashford Borough", "ASH"],
-  ["Brindle Town", "BRI"],
-  ["Cedar Athletic", "CED"],
-  ["Dunmere Rovers", "DUN"],
-  ["Eastvale United", "EAS"],
-  ["Fellbridge Albion", "FEL"],
-  ["Greyford City", "GRE"],
-  ["Holloway Rangers", "HOL"],
-  ["Kingsport Wanderers", "KIN"]
-] as const;
+import { createClosedTransferMarket } from "../transfers/transferWindow";
+import { clubIdentitiesByLeagueLevel } from "../../data/constants/worldProfiles";
+import { MAX_LEAGUE_LEVEL, MIN_LEAGUE_LEVEL, getLeagueIdForLevel } from "../../data/constants/leagueProfiles";
+import type { PlayerNameRegistry } from "../types/game";
 
 export function generateGameState(rng: RandomSource = Math.random): GameState {
-  const provisionalClubIds = clubNames.map((_, index) => `club_seed_${index + 1}`);
-  const league = generateLeague(provisionalClubIds);
   const clubs: Record<string, Club> = {};
   const players: Record<string, Player> = {};
+  const leagues = {} as GameState["leagues"];
+  const nameRegistry: PlayerNameRegistry = { usedFullNames: [], surnameCounts: {} };
   let playerClubId = "";
 
-  for (const [index, [name, shortName]] of clubNames.entries()) {
-    const generated = generateClub({
-      name,
-      shortName,
-      league,
-      isPlayerClub: index === 0,
-      rng
-    });
+  for (let level = MIN_LEAGUE_LEVEL; level <= MAX_LEAGUE_LEVEL; level += 1) {
+    const league = generateLeague([], level);
+    const leagueClubIds: string[] = [];
+    for (const [index, identity] of clubIdentitiesByLeagueLevel[level].entries()) {
+      const isPlayerClub = level === MIN_LEAGUE_LEVEL && index === 0;
+      const generated = generateClub({
+        name: identity.name,
+        shortName: identity.shortName,
+        league,
+        isPlayerClub,
+        nameRegistry,
+        rng
+      });
 
-    clubs[generated.club.id] = generated.club;
-    Object.assign(players, generated.players);
+      clubs[generated.club.id] = generated.club;
+      Object.assign(players, generated.players);
+      leagueClubIds.push(generated.club.id);
 
-    if (index === 0) {
-      playerClubId = generated.club.id;
+      if (isPlayerClub) playerClubId = generated.club.id;
     }
+    leagues[league.id] = generateLeague(leagueClubIds, level);
   }
 
-  const realClubIds = Object.keys(clubs);
-  const activeLeague = {
-    ...league,
-    clubIds: realClubIds
-  };
+  const activeLeague = leagues[getLeagueIdForLevel(MIN_LEAGUE_LEVEL)];
   const seasonId = createId("season", rng);
   const season: Season = {
     id: seasonId,
     seasonNumber: 1,
     leagueId: activeLeague.id,
-    clubIds: realClubIds,
-    fixtures: generateFixtures(realClubIds, seasonId),
-    table: createEmptyTable(realClubIds),
+    clubIds: activeLeague.clubIds,
+    fixtures: generateFixtures(activeLeague.clubIds, seasonId),
+    table: createEmptyTable(activeLeague.clubIds),
     currentMatchday: 1,
     status: "active",
     rewardsPaid: false
   };
-
-  for (const club of Object.values(clubs)) {
-    club.leagueId = activeLeague.id;
-  }
 
   return {
     gameId: createId("game", rng),
@@ -77,9 +66,7 @@ export function generateGameState(rng: RandomSource = Math.random): GameState {
     currentSeasonId: season.id,
     playerClubId,
     clubs,
-    leagues: {
-      [activeLeague.id]: activeLeague
-    },
+    leagues,
     seasons: {
       [season.id]: season
     },
@@ -92,6 +79,8 @@ export function generateGameState(rng: RandomSource = Math.random): GameState {
     history: {
       seasonsCompleted: 0,
       notes: ["Generated Milestone 1 world."]
-    }
+    },
+    transferMarket: createClosedTransferMarket(),
+    nameRegistry
   };
 }

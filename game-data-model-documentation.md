@@ -58,6 +58,8 @@ The first prototype does not need every system fully implemented, but these enti
 
 It stores the current state of the world and links together the player's club, leagues, seasons, and progression.
 
+The current prototype serializes this object as versioned JSON in browser `localStorage`. Temporary UI state, such as the open screen or an unsaved match-preparation draft, is intentionally excluded. Loading returns the player to the Dashboard.
+
 ### Fields
 
 ```ts
@@ -75,6 +77,7 @@ type GameState = {
   matches: Record<string, Match>;
   settings: GameSettings;
   history: GameHistory;
+  transferMarket: TransferMarketState;
 };
 ```
 
@@ -100,6 +103,8 @@ type GameDifficulty =
 
 `GameState` should be serializable. Avoid storing derived values that can be recalculated unless caching becomes necessary later.
 
+As of Milestone 4.2.4, a new save contains a persistent five-division pyramid with 50 clubs. Only the player's current division receives a detailed `Season` fixture schedule. The remaining leagues persist in `leagues` and are advanced through lightweight offseason standings so their clubs can promote, relegate, age, and refresh squads without full match simulation.
+
 ---
 
 ## 4. GameDate
@@ -112,7 +117,7 @@ The game can use a simplified football calendar rather than real daily time.
 type GameDate = {
   seasonNumber: number;
   week: number;
-  phase: "preseason" | "regularSeason" | "postseason";
+  phase: "preseason" | "regularSeason" | "postseason" | "transferWindow";
 };
 ```
 
@@ -134,12 +139,14 @@ type Player = {
   firstName: string;
   lastName: string;
   age: number;
-  nationality?: string;
+  nationality?: string; // Generated players receive a configured football nationality.
 
   clubId: string | null;
   primaryPosition: PlayerPosition;
   secondaryPositions: PlayerPosition[];
   preferredRole?: PlayerRole;
+  squadRole: SquadRole;
+  marketReputation: number; // Visible 1-100 market profile value.
 
   currentStats: OutfieldStats | GoalkeeperStats;
   potentialStats: OutfieldStats | GoalkeeperStats;
@@ -149,8 +156,37 @@ type Player = {
   status: PlayerStatus;
   personality?: PlayerPersonality;
   history: PlayerHistory;
+  transferIntent: PlayerTransferIntent;
+};
+
+type PlayerTransferIntent = {
+  isListed: boolean;
+  listingReason?: "financial_pressure" | "player_unhappy" | "contract_declining" | "too_good_for_division" | "excess_squad" | "none";
+  askingPrice: number;
+  interestLevel: number;
 };
 ```
+
+### Derived Season Performance
+
+Player sheets derive current and previous season summaries from retained fixtures, match reports, and player ratings:
+
+```ts
+type PlayerSeasonSummary = {
+  seasonId: string;
+  seasonNumber: number;
+  apps: number;
+  goals: number;
+  assists: number;
+  avgRating?: number;
+};
+```
+
+These summaries are recalculated from match history rather than duplicated inside `Player`.
+
+### Contract Expiry Grace Period
+
+When a player-club contract reaches `0` seasons during rollover, the player remains attached to the squad throughout the offseason transfer window. The player can still negotiate a renewal, and renewals do not consume limited signing actions. The next season cannot begin while expired player-club contracts remain unresolved or fewer than 11 contracted players are available.
 
 ### Outfield Stats
 
@@ -162,6 +198,9 @@ type OutfieldStats = {
   CRO: number;
   HEA: number;
   ACC: number;
+  STA: number;
+  DRI: number;
+  POS: number;
   TEC: number;
   PHY: number;
   MEN: number;
@@ -225,32 +264,82 @@ type PlayerDevelopment = {
   matchXp: number;
   developmentRate: number;
   ageCurveStage: "youth" | "developing" | "prime" | "declining";
+  unspentDevelopmentPoints: number;
+  developmentPointProgress: number;
   cappedStats: string[];
+  statProgress: Record<string, number>;
+  lastMatchXpGained: number;
+  lastTrainingXpGained: number;
+  lastDevelopmentPointsGained: number;
+  recentStatGrowth: PlayerStatGrowth[];
+  recentDevelopmentNotes: string[];
 };
 ```
+
+Development uses a two-step flow:
+
+```text
+match/training XP -> Development Point -> manual +1 stat allocation
+```
+
+XP no longer increases stats automatically. When a player reaches the configured development threshold, they gain an unspent Development Point. The player can then assign that point to an eligible stat from the player detail sheet. Eligibility is limited by the player's age, stat-specific potential, and the club's current Training Ground development cap.
+
+### Derived Tactical Fit
+
+Player tactical fit is derived from current attributes and position. It is not stored on the player, because it should always reflect the latest stat changes.
+
+```text
+player current stats + position -> score each Tactical Focus -> top 1-3 fit recommendations
+```
+
+The score represents natural suitability for a focus, not pure player quality. A low-league winger can therefore be a strong `Wide Play` or `Fast Breaks` fit if his best relative strengths are crossing, pace, and dribbling. Player sheets show the top 3 fits, while compact squad and transfer tables can show the best fit.
+
+Lineup tactical fit uses the same derived player-fit model, averaged across the currently selected starters. The Tactics screen can therefore show which focuses the selected XI naturally supports while keeping opponent-specific advice separate.
 
 ### Player Contract
 
 ```ts
 type PlayerContract = {
   wagePerWeek: number;
-  weeksRemaining: number;
+  seasonsRemaining: number;
   marketValue: number;
   releaseClause?: number;
 };
 ```
 
+Contracts are tracked in seasons because the core loop is season-based. During offseason rollover, one season is deducted. Players whose contracts expire enter the free-agent pool.
+
 ### Player Status
 
 ```ts
 type PlayerStatus = {
-  fitness: number;
+  fitness: number; // Persistent readiness from 0 to 100.
   morale: number;
   form: number;
   injuryWeeksRemaining: number;
   suspendedMatchesRemaining: number;
 };
 ```
+
+### Player Context
+
+Squad roles communicate expected playing time:
+
+```ts
+type SquadRole =
+  | "key_player"
+  | "regular_starter"
+  | "rotation"
+  | "backup"
+  | "prospect";
+```
+
+Morale remains a 0-100 internal value and is shown as five readable bands: `Thriving`, `Happy`, `Content`, `Frustrated`, and `Disengaged`. Matchday updates consider results, whether playing time matched the squad role, and whether the player's contract is expiring.
+
+`marketReputation` is distinct from ability. It is initialized from ability, potential, and age context, then moves gradually after notable performances.
+
+Fitness (represented in the UI as "Readiness") decreases after starting matches and recovers at the end of each matchday. It directly impacts in-match attributes and accelerates late-match fatigue.
+
 
 ### Player Personality
 
@@ -305,6 +394,8 @@ type Club = {
   economy: EconomyState;
   facilities: FacilitySet;
   tactics: ClubTactics;
+  training: ClubTraining;
+  ecosystem?: ClubEcosystemState;
   academy: YouthAcademy;
   scouting: ScoutingDepartment;
   board?: BoardState;
@@ -313,6 +404,28 @@ type Club = {
   history: ClubHistory;
 };
 ```
+
+### Club Training
+
+```ts
+type ClubTraining = {
+  focusedAssignments: FocusedTrainingAssignment[];
+};
+
+type FocusedTrainingAssignment = {
+  slotIndex: number;
+  playerId: string;
+  focus:
+    | "technical"
+    | "passing"
+    | "finishing"
+    | "defending"
+    | "physical"
+    | "goalkeeping";
+};
+```
+
+Every squad player receives baseline training XP. Focused assignments add an XP multiplier for a limited number of players based on the Training Ground level. They do not target specific stats; they only speed progress toward the player's next manual Development Point.
 
 ### Club Season Stats
 
@@ -345,6 +458,35 @@ type ClubHistory = {
 ### Notes
 
 `board` can be optional until board pressure is implemented. Once Career Challenge Mode exists, the player-controlled club should always have a `BoardState`.
+
+### Club Ecosystem State
+
+AI clubs should feel alive over many seasons without creating infinite power creep or matching the player's progression one-to-one.
+
+```ts
+type ClubEcosystemState = {
+  archetype: ClubArchetype;
+  ambition: number;
+  financialPressure: number;
+  squadNeedProfile: Partial<Record<PlayerPosition, number>>;
+  transferIntent: TransferIntent;
+};
+
+type ClubArchetype =
+  | "ambitious"
+  | "stable"
+  | "youth_development"
+  | "veteran"
+  | "financially_cautious";
+
+type TransferIntent = {
+  likelyToSellPlayerIds: string[];
+  likelyToReleasePlayerIds: string[];
+  targetPositions: PlayerPosition[];
+};
+```
+
+This state should guide simplified AI squad refresh and future transfer markets. It should not make AI clubs train every week exactly like the player.
 
 ---
 
@@ -466,6 +608,8 @@ type EconomyState = {
   academyUpkeep: number;
   sponsorIncomePerWeek: number;
   matchdayIncomeEstimate: number;
+  lastWeeklySummary?: WeeklyFinanceSummary;
+  financeWarnings: string[];
 };
 ```
 
@@ -496,18 +640,40 @@ type Facility = {
   upgradeCost: number;
   upkeepPerWeek: number;
   effects: FacilityEffects;
+  visualState: FacilityVisualState;
+  construction: FacilityConstruction | null;
 };
 
 type FacilityEffects = {
   developmentCapBonus?: number;
   trainingXpBonus?: number;
+  focusedTrainingSlots?: number;
   youthPotentialBonus?: number;
+  intakeProgressPerWeek?: number;
   scoutingAccuracyBonus?: number;
+  marketPoolSize?: number;
   matchdayIncomeBonus?: number;
+  stadiumCapacity?: number;
+  matchdayIncomeMultiplier?: number;
   injuryRiskReduction?: number;
+  readinessRecoveryBonus?: number;
   reportDetailBonus?: number;
 };
+
+type FacilityConstruction = {
+  targetLevel: number;
+  remainingWeeks: number;
+  totalWeeks: number;
+  startedAtSeason: number;
+  startedAtMatchday: number;
+};
 ```
+
+All facility costs, upkeep values, construction durations, and effects are read from centralized typed config profiles. The runtime `Facility` state stores progress and visual metadata, while the config remains the source of truth for balance.
+
+The first playable facility screen exposes five active facilities. `analyticsDepartment` remains a deferred placeholder.
+
+Stadium demand is derived per fixture. `fans` represent the club's long-term supporter base, while reputation, opponent appeal, and derived short-term hype determine the percentage that attends a specific home match. Attendance is capped by the current Stadium capacity.
 
 ### Development Caps
 
@@ -532,6 +698,10 @@ Max trainable stat value: 15
 
 Players with potential above the current cap should be clearly marked as having untapped potential.
 
+Personal potential is fixed independently of age, league level, and facilities. Facilities provide the natural trainable-stat cap. Players aged `30+` keep their historical real POT but have no further normal stat growth.
+
+Signed players show exact `POT`. External market players and unsigned academy prospects show scout-based `Est. POT` intervals. Better scouting facilities narrow uncertainty without changing the underlying player.
+
 ---
 
 ## 10. StaffMember
@@ -549,7 +719,7 @@ type StaffMember = {
   clubId: string | null;
   quality: number;
   wagePerWeek: number;
-  contractWeeksRemaining: number;
+  contractSeasonsRemaining: number;
   traits?: StaffTrait[];
 };
 ```
@@ -623,14 +793,19 @@ type Formation =
   | "4-3-3"
   | "4-2-3-1"
   | "3-5-2"
-  | "5-4-1";
+  | "5-4-1"
+  | "5-3-2"
+  | "3-4-3"
+  | "3-4-2-1";
 
 type TacticalFocus =
   | "balanced"
   | "wide_play"
   | "fast_breaks"
   | "sustained_pressure"
-  | "defensive_shape";
+  | "defensive_shape"
+  | "control"
+  | "tiki_taka";
 
 type RiskLevel =
   | "conservative"
@@ -687,6 +862,7 @@ type League = {
   promotionSpots: number;
   relegationSpots: number;
   playerStatRange: StatRangeProfile;
+  strengthBand: DivisionStrengthBand;
   rewardProfile: LeagueRewardProfile;
   facilityCapLimit: number;
   reputationRequirement?: number;
@@ -705,9 +881,31 @@ type StatRangeProfile = {
 };
 ```
 
+### Division Strength Band
+
+Strength bands define a league's natural football level. They are not hard bans on outliers, but they act as the world's gravity for AI squad refresh, wages, market values, and promotion/relegation adjustment.
+
+```ts
+type DivisionStrengthBand = {
+  targetOvrMin: number;
+  targetOvrMax: number;
+  targetPotentialMin: number;
+  targetPotentialMax: number;
+  rareOutlierPotentialMax: number;
+  facilityLevelMin: number;
+  facilityLevelMax: number;
+  wageMin: number;
+  wageMax: number;
+  marketValueMin: number;
+  marketValueMax: number;
+};
+```
+
 ### Notes
 
 League level should raise the world's standards. It should not directly increase existing player potential.
+
+AI clubs should usually remain within their division's strength band unless promoted, relegated, or temporarily carrying an outlier player. A lower-division club can have a standout player, but that player should become a natural future transfer candidate rather than causing permanent league inflation.
 
 ---
 
@@ -845,8 +1043,14 @@ type ChanceType =
   | "fast_breakaway"
   | "wide_cross"
   | "sustained_pressure"
-  | "rebound_big_chance";
+  | "rebound_big_chance"
+  | "corner"
+  | "indirect_free_kick"
+  | "direct_free_kick"
+  | "penalty";
 ```
+
+The first four values describe open-play and second-ball routes. The final four values form the dangerous set-piece family. Set pieces are generated from match context rather than placed directly inside the ordinary open-play tactic weighting table.
 
 ### Display Timeline Event
 
@@ -1088,10 +1292,8 @@ The academy generates internal prospects over time.
 
 ```ts
 type YouthAcademy = {
-  level: number;
-  weeklyUpkeep: number;
   prospectGenerationProgress: number;
-  prospectGenerationRate: number;
+  pendingProspect: Player | null;
   youthCoachBonus: number;
 };
 ```
@@ -1117,7 +1319,7 @@ type YouthProspect = {
 
 ### Notes
 
-Academy investment should improve prospect frequency, average potential, rare high-potential chance, and preview accuracy.
+Facility config owns the academy level, upkeep, progress-per-week, and quality bias. Runtime academy state owns progress and the pending intake decision. Academy investment should improve prospect frequency, average potential, rare high-potential chance, and preview accuracy.
 
 ---
 
@@ -1154,7 +1356,58 @@ Opposition reports should provide clues, not perfect answers.
 
 ---
 
-## 20. Values That Should Be Derived
+## 20. TransferMarket Foundation
+
+Transfers should eventually connect the league ecosystem, player potential, wages, reputation, and scouting.
+
+The recommended first transfer implementation is a curated market rather than full "approach any player" freedom.
+
+```ts
+type TransferMarketState = {
+  status: "closed" | "open";
+  currentWeek: number;
+  totalWeeks: number;
+  actionsRemaining: number;
+  listedPlayerIds: string[];
+  freeAgentPlayerIds: string[];
+  scoutedOpportunityPlayerIds: string[];
+  negotiations: Record<string, TransferNegotiation>;
+  incomingOffers: TransferOffer[];
+};
+
+type TransferCandidateReason =
+  | "free_agent"
+  | "listed"
+  | "relegated_club_pressure"
+  | "financial_pressure"
+  | "above_club_level"
+  | "aging_veteran"
+  | "youth_prospect"
+  | "squad_surplus";
+```
+
+Future transfer willingness should consider:
+
+- player quality compared with current club and buying club
+- league level
+- reputation
+- wage offer
+- expected playing time
+- contract length
+- club financial pressure
+- whether the move is a step up, sideways step, or step down
+
+The implemented 4.2.0 foundation generates candidate pools and opens a staged offseason transfer window.
+
+Milestone 4.2.2 adds curated purchases and contract renewals. Every submitted offer spends one offseason action. The player selects a promised squad role, a 1-3 season contract, and one of four packages: `Lowball`, `Cautious`, `Fair`, or `Statement`. Negotiation willingness is deterministic and config-driven so playtests can tune the system without rewriting domain logic.
+
+Accepted purchases deduct the transfer fee, move the player between clubs, apply the new wage and contract terms, and remove the player from market pools. Accepted renewals use the same offer model without a transfer fee.
+
+Milestone 4.2.3 adds lightweight player-club sales. A listed player uses one of three config-driven strategies: `Quick Sale`, `Market Price`, or `Hold Out`. These strategies trade asking price against AI-offer probability. Affordable AI clubs are prioritized by squad need, squad depth, and archetype. Incoming offers expire after their active transfer week. Accepted sales move the player, update both squads and cash balances, record finance-ledger entries for both clubs, and do not consume a signing action.
+
+---
+
+## 21. Values That Should Be Derived
 
 Some values should usually be calculated from existing data instead of stored permanently.
 
@@ -1175,7 +1428,7 @@ Store derived values only when useful for historical records, match reports, or 
 
 ---
 
-## 21. First Implementable Version
+## 22. First Implementable Version
 
 The first implementation can use a smaller subset of this model:
 

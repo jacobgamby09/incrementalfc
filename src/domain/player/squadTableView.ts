@@ -1,17 +1,20 @@
 import { calculatePlayerOvr, calculatePlayerPot, getPlayerPerformanceSummary } from "./playerSummaries";
+import { getPlayerFitness } from "../fitness/playerFitness";
 import { getPlayerCapStatus } from "../development/playerDevelopment";
 import type { GameState } from "../types/game";
 import type { OutfieldStatKey, Player, PlayerPosition } from "../types/player";
 import { isGoalkeeperStats } from "../types/player";
 import { getStatDefinition } from "./statDefinitions";
 import { getOutfieldStatValue } from "./statAccess";
+import { squadRoleLabels } from "./playerContext";
+import { getBestPlayerTacticalFit } from "./tacticalFit";
 
 export type SortDirection = "asc" | "desc";
 export type SquadAgeFilter = "all" | "youth" | "developing" | "prime" | "veteran";
 
 export type SquadFilters = {
   position: "all" | PlayerPosition;
-  capStatus: "all" | ReturnType<typeof getPlayerCapStatus>;
+  developmentStatus: "all" | ReturnType<typeof getPlayerCapStatus>;
   ageGroup: SquadAgeFilter;
 };
 
@@ -59,7 +62,13 @@ export function squadSortValue(player: Player, column: string, gameState?: GameS
   if (column === "Age") return player.age;
   if (column === "Position") return positionOrder.indexOf(player.primaryPosition);
   if (column === "OVR") return calculatePlayerOvr(player);
-  if (column === "Est. POT") return calculatePlayerPot(player);
+  if (column === "POT" || column === "Est. POT") return calculatePlayerPot(player);
+  if (column === "Dev Points") return player.development.unspentDevelopmentPoints ?? 0;
+  if (column === "Readiness") return getPlayerFitness(player);
+  if (column === "Morale") return player.status.morale;
+  if (column === "Squad Role") return squadRoleLabels[player.squadRole];
+  if (column === "Market Rep") return player.marketReputation;
+  if (column === "Best Focus") return getBestPlayerTacticalFit(player).score;
   if (column === "Form") return performance?.lastRating ?? -1;
   if (column === "Avg Rating") return performance?.avgRating ?? -1;
   if (column === "Last Rating") return performance?.lastRating ?? -1;
@@ -68,11 +77,11 @@ export function squadSortValue(player: Player, column: string, gameState?: GameS
   if (column === "Match XP") return player.development.matchXp;
   if (column === "Training XP") return player.development.trainingXp;
   if (column === "Last XP") return player.development.lastMatchXpGained + player.development.lastTrainingXpGained;
-  if (column === "Cap Status") return club ? getPlayerCapStatus(player, club) : "Developing";
+  if (column === "Development Status") return club ? getPlayerCapStatus(player, club) : "Developing";
   if (column === "Apps") return performance?.apps ?? 0;
   if (column === "Goals") return performance?.goals ?? 0;
   if (column === "Assists/Key Passes") return (performance?.assists ?? 0) + (performance?.keyPasses ?? 0);
-  if (column === "Contract Remaining") return player.contract.weeksRemaining;
+  if (column === "Contract Remaining") return player.contract.seasonsRemaining;
   if (getStatDefinition(column)) return getSquadStatValue(player, column);
   return String(player.primaryPosition);
 }
@@ -81,9 +90,9 @@ export function filterSquadPlayers(players: Player[], gameState: GameState | und
   return players.filter((player) => {
     if (filters.position !== "all" && player.primaryPosition !== filters.position) return false;
     if (filters.ageGroup !== "all" && getAgeGroup(player) !== filters.ageGroup) return false;
-    if (filters.capStatus !== "all") {
+    if (filters.developmentStatus !== "all") {
       const club = gameState && player.clubId ? gameState.clubs[player.clubId] : undefined;
-      if (!club || getPlayerCapStatus(player, club) !== filters.capStatus) return false;
+      if (!club || getPlayerCapStatus(player, club) !== filters.developmentStatus) return false;
     }
     return true;
   });
